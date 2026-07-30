@@ -17,3 +17,5 @@ pillow==11.1.0
 argon2-cffi==23.1.0
 # PyJWT em vez de python-jose: mantido ativamente e com superficie bem menor.
 pyjwt==2.10.1
+# Criptografia em repouso das imagens de rosto (AES-GCM).
+cryptography==44.0.0

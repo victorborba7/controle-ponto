@@ -7,7 +7,9 @@ substituto testaria algo diferente do que vai para producao.
 
 import uuid
 from collections.abc import AsyncGenerator
+from pathlib import Path
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
@@ -18,6 +20,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.api.deps import get_storage
 from app.core.config import settings
 from app.core.security import hash_password
 from app.db.base import Base
@@ -25,9 +28,13 @@ from app.db.session import get_session
 from app.main import app
 from app.models import Employee, Site, Tenant, User
 from app.models.enums import UserRole
+from app.services.storage import Storage, build_storage
 
 TEST_DB_NAME = "ponto_facial_test"
 TEST_PASSWORD = "senha-de-teste"
+
+# 32 bytes em base64, so para teste.
+TEST_ENCRYPTION_KEY = "ZGVzZW52b2x2aW1lbnRvLWFwZW5hcy1uYW8tdXNlISE="
 
 
 def _swap_database(url: str, database: str) -> str:
@@ -73,15 +80,31 @@ async def db(engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
         await conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
 
 
+@pytest.fixture
+def storage_dir(tmp_path: Path) -> Path:
+    """Diretorio de imagens do teste, descartado ao final."""
+    return tmp_path / "storage"
+
+
+@pytest.fixture
+def storage(storage_dir: Path) -> Storage:
+    """Storage do teste — cifrado, igual ao de producao, mas em tmp.
+
+    Um teste que precise inspecionar os bytes crus usa `storage_dir` direto.
+    """
+    return build_storage(str(storage_dir), TEST_ENCRYPTION_KEY)
+
+
 @pytest_asyncio.fixture(loop_scope="session")
-async def client(db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+async def client(db: AsyncSession, storage: Storage) -> AsyncGenerator[AsyncClient, None]:
     """Cliente HTTP falando com a app real.
 
     A app compartilha a sessao do teste, entao o que o teste grava fica
-    visivel para o endpoint sem precisar de sincronizacao.
+    visivel para o endpoint sem precisar de sincronizacao. O storage tambem e
+    substituido, para nenhum teste escrever no diretorio real de imagens.
     """
 
-    async def _override() -> AsyncGenerator[AsyncSession, None]:
+    async def _override_session() -> AsyncGenerator[AsyncSession, None]:
         try:
             yield db
             await db.commit()
@@ -89,7 +112,9 @@ async def client(db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
             await db.rollback()
             raise
 
-    app.dependency_overrides[get_session] = _override
+    app.dependency_overrides[get_session] = _override_session
+    app.dependency_overrides[get_storage] = lambda: storage
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as http_client:
         yield http_client

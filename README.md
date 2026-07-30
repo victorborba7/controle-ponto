@@ -114,6 +114,19 @@ Este sistema trata **dado biométrico**, que é dado pessoal sensível pela LGPD
 
 - O `.env` nunca vai para o repositório — use o `.env.example` como modelo.
 - Imagens de funcionários e embeddings não são versionados (ver `.gitignore`).
-- Embeddings nunca são retornados por nenhum endpoint da API.
-- Em produção, `JWT_SECRET` precisa ser gerado aleatoriamente e guardado no
-  gerenciador de segredos da plataforma, nunca em arquivo.
+- **Embeddings nunca são retornados por nenhum endpoint** — há teste garantindo.
+- **Imagens de rosto são gravadas cifradas** (AES-GCM), inclusive em disco local
+  de desenvolvimento.
+- Cadastro biométrico exige consentimento explícito, com a versão do termo
+  aceito registrada.
+
+Em produção, gere segredos novos e guarde-os no gerenciador da plataforma —
+nunca em arquivo:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"          # JWT_SECRET
+python -c "import base64,os; print(base64.b64encode(os.urandom(32)).decode())"  # STORAGE_ENCRYPTION_KEY
+```
+
+> Perder a `STORAGE_ENCRYPTION_KEY` torna as imagens já gravadas
+> irrecuperáveis. Ela não rotaciona sozinha.

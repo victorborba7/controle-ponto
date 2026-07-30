@@ -5,17 +5,22 @@ TenantRepository. Um endpoint que peca `TenantRepo` ja recebe acesso a dados
 restrito ao tenant do token, sem ter de fazer nada.
 """
 
+from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.security import decode_access_token
 from app.core.tenancy import Principal, principal_from_claims
 from app.db.repository import TenantRepository
 from app.db.session import get_session
+from app.facial import get_face_engine
+from app.facial.runner import AsyncFaceEngine
 from app.models.enums import UserRole
+from app.services.storage import Storage, build_storage
 
 # auto_error=False para responder 401 com o mesmo formato dos demais erros,
 # em vez do 403 que o HTTPBearer devolve por padrao quando falta o cabecalho.
@@ -110,3 +115,26 @@ async def get_tenant_repository(
 
 
 TenantRepo = Annotated[TenantRepository, Depends(get_tenant_repository)]
+
+
+@lru_cache(maxsize=1)
+def _storage() -> Storage:
+    """Instancia unica: nao ha estado por requisicao a isolar."""
+    return build_storage(settings.storage_path, settings.storage_encryption_key)
+
+
+def get_storage() -> Storage:
+    return _storage()
+
+
+def get_engine() -> AsyncFaceEngine:
+    """Engine facial da aplicacao.
+
+    Exposta como dependencia (e nao importada direto nos endpoints) para o
+    teste conseguir substitui-la por uma engine controlada.
+    """
+    return get_face_engine()
+
+
+StorageDep = Annotated[Storage, Depends(get_storage)]
+FaceEngineDep = Annotated[AsyncFaceEngine, Depends(get_engine)]

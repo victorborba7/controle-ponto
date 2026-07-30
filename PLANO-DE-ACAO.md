@@ -3,7 +3,7 @@
 > Documento de execução. O "o quê" e o "porquê" estão em [CLAUDE.MD](CLAUDE.MD).
 > Aqui está o **como** e em **que ordem**.
 
-**Status geral:** `Etapas 0 a 3 concluídas — Etapa 4 a seguir`
+**Status geral:** `Etapas 0 a 4 concluídas — Etapa 5 a seguir`
 **Última atualização:** 2026-07-30
 
 ---
@@ -151,6 +151,13 @@ Postgres + API respondendo.
 - Imagem original salva criptografada; **embedding nunca sai pela API**
 
 **Critério de pronto:** cadastrar funcionário + 3 fotos por HTTP e ver os templates persistidos com score de qualidade.
+
+> **Criptografia em repouso: feita aqui, não na Etapa 11.** Ela aparecia nas
+> duas etapas. Antecipar foi barato — `EncryptedStorage` (AES-GCM) envolve
+> qualquer backend, então a mesma proteção vale para o disco local hoje e para
+> o S3 depois — e evitou gravar biometria em claro durante todo o
+> desenvolvimento. A Etapa 11 fica com o que sobra: retenção, expurgo e
+> gestão da chave em produção.
 
 ---
 
@@ -343,7 +350,7 @@ Postgres + API respondendo.
 | 1 — Modelo de dados | 🟢 concluída | 2026-07-30 |
 | 2 — Auth e tenancy | 🟢 concluída | 2026-07-30 |
 | 3 — Módulo facial | 🟢 concluída | 2026-07-30 |
-| 4 — Cadastro e enrollment | ⚪ não iniciada | |
+| 4 — Cadastro e enrollment | 🟢 concluída | 2026-07-30 |
 | 5 — Locais e beacons | ⚪ não iniciada | |
 | 6 — Validação de localização | ⚪ não iniciada | |
 | 7 — Bater ponto | ⚪ não iniciada | |

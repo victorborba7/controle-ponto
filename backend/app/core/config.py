@@ -48,6 +48,11 @@ class Settings(BaseSettings):
 
     # --- Armazenamento de imagens ---
     storage_path: str = "/app/storage"
+    # Chave AES-256 em base64 (32 bytes) para criptografar as imagens de rosto
+    # em repouso. Obrigatoria: imagem de rosto e dado biometrico, e gravar em
+    # claro nao e aceitavel nem em desenvolvimento. Gerar com:
+    #   python -c "import base64,os; print(base64.b64encode(os.urandom(32)).decode())"
+    storage_encryption_key: str = Field(min_length=44)
 
     # --- CORS ---
     cors_origins: list[str] = ["http://localhost:3000"]
