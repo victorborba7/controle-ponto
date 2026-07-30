@@ -46,6 +46,15 @@ class Settings(BaseSettings):
     face_min_enrollment_images: int = 3
     face_max_enrollment_images: int = 5
 
+    # --- Registro de ponto ---
+    # Duas batidas seguidas dentro deste intervalo sao o mesmo toque repetido,
+    # nao dois eventos.
+    time_entry_min_interval_seconds: int = 60
+    # Divergencia tolerada entre o relogio do aparelho e o do servidor. Acima
+    # disso o registro vai para revisao: ou o envio ficou preso numa area sem
+    # sinal, ou o relogio do celular foi ajustado.
+    time_entry_max_clock_skew_seconds: int = 900
+
     # --- Armazenamento de imagens ---
     storage_path: str = "/app/storage"
     # Chave AES-256 em base64 (32 bytes) para criptografar as imagens de rosto

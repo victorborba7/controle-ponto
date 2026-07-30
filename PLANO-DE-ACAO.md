@@ -3,7 +3,7 @@
 > Documento de execução. O "o quê" e o "porquê" estão em [CLAUDE.MD](CLAUDE.MD).
 > Aqui está o **como** e em **que ordem**.
 
-**Status geral:** `Etapas 0 a 6 concluídas — Etapa 7 a seguir (fecha o backend)`
+**Status geral:** `🏁 Backend do MVP funcional (etapas 0 a 7) — Etapa 8 a seguir`
 **Última atualização:** 2026-07-30
 
 ---
@@ -234,7 +234,24 @@ Postgres + API respondendo.
 
 **Critério de pronto:** roteiro completo via HTTP — cadastra funcionário, enrola rosto, bate ponto com beacon, com Wi-Fi, com GPS e sem sinal nenhum; os quatro registros aparecem com o método correto.
 
-> **Marco: backend do MVP funcional.** Daqui em diante são as interfaces.
+> **A decisão de status é uma função pura** (`time_entry_decision.py`), separada
+> da orquestração. É a regra mais consequente do sistema — decide se alguém
+> recebe pelo dia trabalhado — e precisa ser legível e exercitável sem foto, sem
+> banco e sem rede.
+
+> **Rosto claramente diferente não vira registro nenhum.** É a única recusa dura
+> do fluxo, e a selfie **não é guardada**: o sistema acabou de concluir que
+> aquela pessoa não é o titular, e armazenar biometria de um terceiro que nunca
+> consentiu criaria exatamente o problema que a LGPD existe para evitar. A
+> tentativa fica na trilha de auditoria, que é onde a investigação de segurança
+> precisa dela.
+
+> **Limitação conhecida — batida offline.** O `recorded_at` é sempre o horário do
+> servidor, porque o relógio do celular é ajustável pelo próprio funcionário.
+> Uma batida represada numa área sem sinal e enviada horas depois chega com o
+> horário do envio, não o da batida. O sistema detecta a divergência pelo
+> `client_recorded_at` e manda para revisão com o motivo explícito, mas **o RH
+> precisa poder corrigir o horário** — funcionalidade a incluir na Etapa 8.
 
 ---
 
@@ -249,6 +266,9 @@ Postgres + API respondendo.
 - Locais: sites, beacons e redes Wi-Fi
 - Pontos: tabela com filtros, **coluna do método de localização** e do score, foto do registro
 - Fila de revisão das pendências
+- **Correção de horário em registros pendentes** — necessário para batidas
+  enviadas com atraso, que chegam com o horário do envio (ver a limitação na
+  Etapa 7)
 - Exportar CSV do período
 
 **Critério de pronto:** operar o ciclo inteiro pelo navegador, sem tocar na API na mão.
@@ -376,7 +396,7 @@ Postgres + API respondendo.
 | 4 — Cadastro e enrollment | 🟢 concluída | 2026-07-30 |
 | 5 — Locais e beacons | 🟢 concluída | 2026-07-30 |
 | 6 — Validação de localização | 🟢 concluída | 2026-07-30 |
-| 7 — Bater ponto | ⚪ não iniciada | |
+| 7 — Bater ponto | 🟢 concluída | 2026-07-30 |
 | 8 — Painel admin | ⚪ não iniciada | |
 | 9 — App do funcionário (Android) | ⚪ não iniciada | |
 | 9b — Paridade no iOS | ⚪ não iniciada | |

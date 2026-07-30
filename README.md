@@ -7,6 +7,10 @@ física (beacon BLE → Wi-Fi → GPS).
 - **Plano de execução por etapas:** [PLANO-DE-ACAO.md](PLANO-DE-ACAO.md)
 - **Instalação e cadastro dos beacons:** [docs/mapeamento-beacons.md](docs/mapeamento-beacons.md)
 
+**Estado atual:** backend do MVP funcional — cadastro de funcionários,
+enrollment facial, locais/beacons/Wi-Fi e o registro de ponto ponta a ponta.
+Painel do RH e app do funcionário são as próximas etapas.
+
 ## Estrutura
 
 ```

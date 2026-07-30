@@ -114,6 +114,11 @@ def cosine_similarity(a: Sequence[float], b: Sequence[float]) -> float:
     Normaliza os dois lados em vez de assumir que ja vieram normalizados: a
     funcao tambem e usada com vetores lidos do banco, e um template gravado por
     uma versao antiga poderia nao estar normalizado.
+
+    O `float()` no retorno nao e decorativo. Um dos lados costuma vir do
+    pgvector, que devolve `numpy.ndarray`, e a conta entao produz um
+    `numpy.float32` — que o `json.dumps` nao serializa. Sem a conversao, o
+    score contamina o payload de auditoria e a gravacao do ponto falha.
     """
     if len(a) != len(b):
         raise ValueError(f"Dimensoes incompativeis: {len(a)} != {len(b)}")
@@ -126,7 +131,7 @@ def cosine_similarity(a: Sequence[float], b: Sequence[float]) -> float:
 
     if norm_a == 0.0 or norm_b == 0.0:
         return 0.0
-    return dot / (math.sqrt(norm_a) * math.sqrt(norm_b))
+    return float(dot / (math.sqrt(norm_a) * math.sqrt(norm_b)))
 
 
 def classify_score(

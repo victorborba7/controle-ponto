@@ -72,6 +72,25 @@ def test_cosseno_com_vetor_nulo_nao_divide_por_zero():
     assert cosine_similarity([0.0, 0.0], [1.0, 0.0]) == 0.0
 
 
+def test_cosseno_devolve_float_de_python_mesmo_com_vetor_numpy():
+    """Regressao: o score contaminava o JSONB e derrubava a gravacao do ponto.
+
+    O pgvector devolve o embedding como `numpy.ndarray`, e a conta produzia um
+    `numpy.float32` — que `json.dumps` nao serializa. O score entra no payload
+    de auditoria do registro de ponto, entao toda batida falhava na gravacao.
+    """
+    import json
+
+    import numpy as np
+
+    score = cosine_similarity(
+        np.array([0.6, 0.8], dtype=np.float32), np.array([0.6, 0.8], dtype=np.float32)
+    )
+
+    assert type(score) is float
+    assert json.dumps({"score": score})
+
+
 @pytest.mark.parametrize(
     ("score", "esperado"),
     [
