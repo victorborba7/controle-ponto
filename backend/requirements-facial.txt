@@ -1,0 +1,8 @@
+# Reconhecimento facial — entra na Etapa 3.
+# Separado do requirements.txt porque soma ~1GB e deixaria o build de dev lento.
+# O modelo (buffalo_l, ~300MB) NAO vai na imagem: e baixado para um volume no primeiro uso.
+insightface==0.7.3
+onnxruntime==1.20.1
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+mediapipe==0.10.18

@@ -1,0 +1,53 @@
+# ---- Segredos e ambiente ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---- Dados sensiveis (biometria / LGPD) ----
+# Nunca versionar imagem de funcionario nem embedding.
+backend/storage/
+uploads/
+*.npy
+
+# ---- Modelos de reconhecimento facial (baixados em runtime, ~300MB) ----
+# Caminho especifico de proposito: um "models/" solto ignoraria o pacote
+# backend/app/models/, que e codigo-fonte e precisa ser versionado.
+/models/
+backend/models/
+*.onnx
+*.tflite
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# ---- Node / React Native / Next.js ----
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+.expo/
+.expo-shared/
+*.apk
+*.aab
+*.ipa
+# Diretorios nativos gerados pelo `expo prebuild` — nao versionar.
+employee-app/android/
+employee-app/ios/
+
+# ---- Ferramentas ----
+.DS_Store
+Thumbs.db
+*.log

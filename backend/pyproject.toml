@@ -1,0 +1,15 @@
+# Apenas configuracao de ferramentas.
+# As dependencias ficam nos requirements*.txt (formato pedido no CLAUDE.MD e o que
+# o Dockerfile consome, permitindo instalar so as libs sem copiar o codigo-fonte).
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]

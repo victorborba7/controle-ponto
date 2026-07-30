@@ -1,0 +1,42 @@
+services:
+  db:
+    # pgvector desde o inicio (decisao D2 do PLANO-DE-ACAO.md): evita migrar
+    # a coluna de embeddings depois que a base crescer.
+    image: pgvector/pgvector:pg16
+    container_name: ponto-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ponto}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ponto}
+      POSTGRES_DB: ${POSTGRES_DB:-ponto_facial}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ponto} -d ${POSTGRES_DB:-ponto_facial}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+    container_name: ponto-api
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ponto}:${POSTGRES_PASSWORD:-ponto}@db:5432/${POSTGRES_DB:-ponto_facial}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # Bind mount do codigo: o uvicorn --reload recarrega ao salvar o arquivo.
+      - ./backend:/app
+      # Modelos de reconhecimento facial em volume nomeado (Etapa 3), fora da imagem.
+      - facemodels:/root/.insightface
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  facemodels:
