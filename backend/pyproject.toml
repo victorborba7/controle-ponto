@@ -5,9 +5,32 @@
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Migracoes sao geradas pelo Alembic: reformatar a mao a cada autogenerate e
+# trabalho perdido, e o conteudo delas ja foi revisado ao aplicar.
+extend-exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+# Sem isto o ruff trata `alembic` como pacote local, so porque existe um
+# diretorio alembic/ na raiz do backend, e embaralha a ordem dos imports.
+known-first-party = ["app"]
+known-third-party = ["alembic"]
+
+[tool.ruff.lint.flake8-bugbear]
+# `param: X = Depends(...)` e a forma canonica de injecao no FastAPI. O B008
+# existe para pegar default mutavel compartilhado entre chamadas, o que nao se
+# aplica: o FastAPI reavalia a dependencia a cada request.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Header",
+    "fastapi.File",
+    "fastapi.Form",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

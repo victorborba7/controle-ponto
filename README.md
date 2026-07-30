@@ -23,6 +23,8 @@ o backend roda inteiro em container (decisão D1 do plano).
 ```bash
 cp .env.example .env          # Windows/PowerShell: Copy-Item .env.example .env
 docker compose up -d --build
+docker compose exec api alembic upgrade head    # cria o schema
+docker compose exec api python -m app.db.seed   # dados de exemplo (opcional)
 ```
 
 Verificar:
@@ -42,12 +44,30 @@ a API automaticamente, sem rebuild.
 ## Comandos úteis
 
 ```bash
-docker compose logs -f api      # acompanhar os logs da API
-docker compose exec api bash    # shell dentro do container
-docker compose exec api pytest  # rodar os testes
-docker compose down             # parar (mantém os dados)
-docker compose down -v          # parar e APAGAR o banco
+docker compose logs -f api         # acompanhar os logs da API
+docker compose exec api bash       # shell dentro do container
+docker compose exec api pytest     # rodar os testes
+docker compose exec api ruff check app/ alembic/   # lint
+docker compose down                # parar (mantém os dados)
+docker compose down -v             # parar e APAGAR o banco
 ```
+
+### Migrações
+
+```bash
+docker compose exec api alembic upgrade head
+docker compose exec api alembic revision --autogenerate -m "descrição"
+docker compose exec api alembic check      # o schema bate com os modelos?
+docker compose exec api alembic downgrade -1
+```
+
+Ao criar um modelo novo, **importe-o em `backend/app/models/__init__.py`** — é o
+que faz o Alembic enxergá-lo no autogenerate. Sem isso a migração sai vazia.
+
+### Credenciais do seed
+
+Só para desenvolvimento local: admin `rh@empresademo.com.br` e funcionários
+`0001` / `0002`, todos com a senha `senha123`.
 
 ## Segurança e dados sensíveis
 

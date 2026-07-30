@@ -3,7 +3,7 @@
 > Documento de execução. O "o quê" e o "porquê" estão em [CLAUDE.MD](CLAUDE.MD).
 > Aqui está o **como** e em **que ordem**.
 
-**Status geral:** `Etapa 0 concluída — Etapa 1 a seguir`
+**Status geral:** `Etapas 0 e 1 concluídas — Etapa 2 a seguir`
 **Última atualização:** 2026-07-30
 
 ---
@@ -304,7 +304,7 @@ Postgres + API respondendo.
 | Etapa | Status | Concluída em |
 |---|---|---|
 | 0 — Fundação | 🟢 concluída | 2026-07-30 |
-| 1 — Modelo de dados | ⚪ não iniciada | |
+| 1 — Modelo de dados | 🟢 concluída | 2026-07-30 |
 | 2 — Auth e tenancy | ⚪ não iniciada | |
 | 3 — Módulo facial | ⚪ não iniciada | |
 | 4 — Cadastro e enrollment | ⚪ não iniciada | |
