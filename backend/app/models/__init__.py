@@ -16,11 +16,13 @@ from app.models.enums import (
     EmployeeStatus,
     EntryType,
     LocationMethod,
+    SubjectType,
     TimeEntryStatus,
     UserRole,
 )
 from app.models.face_template import EMBEDDING_DIM, FaceTemplate
 from app.models.location import Beacon, Site, WifiNetwork
+from app.models.refresh_token import RefreshToken
 from app.models.tenant import Tenant
 from app.models.time_entry import TimeEntry
 from app.models.user import User
@@ -41,7 +43,9 @@ __all__ = [
     "EntryType",
     "FaceTemplate",
     "LocationMethod",
+    "RefreshToken",
     "Site",
+    "SubjectType",
     "Tenant",
     "TimeEntry",
     "TimeEntryStatus",

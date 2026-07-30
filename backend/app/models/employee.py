@@ -7,7 +7,6 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
-    Enum,
     ForeignKey,
     String,
     UniqueConstraint,
@@ -16,6 +15,7 @@ from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin
+from app.db.types import enum_column
 from app.models.enums import DevicePlatform, EmployeeStatus
 
 
@@ -42,7 +42,7 @@ class Employee(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     status: Mapped[EmployeeStatus] = mapped_column(
-        Enum(EmployeeStatus, name="employee_status", native_enum=False, length=20),
+        enum_column(EmployeeStatus, "employee_status", length=20),
         nullable=False,
         default=EmployeeStatus.ACTIVE,
     )
@@ -88,7 +88,7 @@ class Device(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
     # Identificador estavel gerado pelo app e guardado no secure storage.
     device_fingerprint: Mapped[str] = mapped_column(String(255), nullable=False)
     platform: Mapped[DevicePlatform] = mapped_column(
-        Enum(DevicePlatform, name="device_platform", native_enum=False, length=20),
+        enum_column(DevicePlatform, "device_platform", length=20),
         nullable=False,
     )
     model: Mapped[str | None] = mapped_column(String(120), nullable=True)

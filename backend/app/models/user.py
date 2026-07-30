@@ -7,10 +7,11 @@ ganha um User; nao vira um Employee com flag de admin.
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin
+from app.db.types import enum_column
 from app.models.enums import UserRole
 
 
@@ -26,7 +27,7 @@ class User(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole, name="user_role", native_enum=False, length=20),
+        enum_column(UserRole, "user_role", length=20),
         nullable=False,
         default=UserRole.HR,
     )

@@ -36,3 +36,8 @@ extend-immutable-calls = [
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+# Fixtures no event loop da sessao, para o engine sobreviver entre testes.
+# Os modulos de teste declaram `pytestmark` com o mesmo loop_scope: sem isso o
+# engine vive num loop e os testes em outro, e uma conexao asyncpg nao
+# atravessa loops ("attached to a different loop").
+asyncio_default_fixture_loop_scope = "session"

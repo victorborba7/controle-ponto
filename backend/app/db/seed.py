@@ -66,18 +66,19 @@ async def seed(session: AsyncSession) -> None:
     session.add(site)
     await session.flush()
 
+    # Eddystone nos dois: e o formato decidido para o hardware real (D8), o
+    # unico que Android e iOS leem pela mesma API de Bluetooth. O suporte a
+    # iBeacon continua no modelo e coberto por teste, para o caso de um dia
+    # ser preciso deteccao em segundo plano no iOS.
     session.add_all(
         [
-            # Dois protocolos de proposito: a escolha do hardware ainda depende
-            # do risco R1 (iOS x iBeacon), e o seed exercita os dois caminhos.
             Beacon(
                 tenant_id=tenant.id,
                 site_id=site.id,
                 label="Hangar - Portao A",
-                protocol=BeaconProtocol.IBEACON,
-                ibeacon_uuid="f7826da6-4fa2-4e98-8024-bc5b71e0893e",
-                ibeacon_major=1,
-                ibeacon_minor=1,
+                protocol=BeaconProtocol.EDDYSTONE,
+                eddystone_namespace="edd1ebeac04e5defa017",
+                eddystone_instance="000000000001",
                 min_rssi=-75,
             ),
             Beacon(
@@ -86,7 +87,7 @@ async def seed(session: AsyncSession) -> None:
                 label="Hangar - Almoxarifado",
                 protocol=BeaconProtocol.EDDYSTONE,
                 eddystone_namespace="edd1ebeac04e5defa017",
-                eddystone_instance="000000000001",
+                eddystone_instance="000000000002",
                 min_rssi=-80,
             ),
         ]
@@ -135,7 +136,7 @@ async def seed(session: AsyncSession) -> None:
     print(f"  tenant......: {tenant.name} (slug: {tenant.slug})")
     print(f"  admin.......: {admin.email} / {DEMO_PASSWORD}")
     print(f"  site........: {site.name}")
-    print("  beacons.....: 2 (1 iBeacon, 1 Eddystone)")
+    print("  beacons.....: 2 (Eddystone)")
     print("  wifi........: 1")
     print(f"  funcionarios: 0001 e 0002 / {DEMO_PASSWORD}")
 

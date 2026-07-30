@@ -64,6 +64,17 @@ docker compose exec api alembic downgrade -1
 Ao criar um modelo novo, **importe-o em `backend/app/models/__init__.py`** — é o
 que faz o Alembic enxergá-lo no autogenerate. Sem isso a migração sai vazia.
 
+### Testes
+
+Rodam contra um Postgres de verdade, num banco separado (`ponto_facial_test`)
+que é recriado a cada execução — o schema depende de pgvector e JSONB, então
+testar em SQLite testaria outra coisa.
+
+```bash
+docker compose exec api pytest          # tudo
+docker compose exec api pytest -q tests/test_tenant_isolation.py
+```
+
 ### Credenciais do seed
 
 Só para desenvolvimento local: admin `rh@empresademo.com.br` e funcionários

@@ -9,9 +9,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    JSON,
     DateTime,
-    Enum,
     ForeignKey,
     Index,
     String,
@@ -22,6 +20,7 @@ from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin
+from app.db.types import enum_column
 from app.models.enums import AuditAction, ConsentType
 
 
@@ -44,7 +43,7 @@ class Consent(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
         nullable=False,
     )
     consent_type: Mapped[ConsentType] = mapped_column(
-        Enum(ConsentType, name="consent_type", native_enum=False, length=20),
+        enum_column(ConsentType, "consent_type", length=20),
         nullable=False,
     )
     # Versao do texto aceito. Mudou o termo, precisa de novo aceite — sem isto
@@ -91,16 +90,14 @@ class AuditLog(UUIDPrimaryKeyMixin, TenantMixin, Base):
     actor_label: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     action: Mapped[AuditAction] = mapped_column(
-        Enum(AuditAction, name="audit_action", native_enum=False, length=30),
+        enum_column(AuditAction, "audit_action", length=30),
         nullable=False,
     )
     entity_type: Mapped[str | None] = mapped_column(String(60), nullable=True)
     entity_id: Mapped[uuid.UUID | None] = mapped_column(PgUUID(as_uuid=True), nullable=True)
 
     # Contexto do evento. NUNCA guardar aqui imagem, embedding ou senha.
-    payload: Mapped[dict | None] = mapped_column(
-        JSONB().with_variant(JSON(), "sqlite"), nullable=True
-    )
+    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)

@@ -3,7 +3,7 @@
 > Documento de execução. O "o quê" e o "porquê" estão em [CLAUDE.MD](CLAUDE.MD).
 > Aqui está o **como** e em **que ordem**.
 
-**Status geral:** `Etapas 0 e 1 concluídas — Etapa 2 a seguir`
+**Status geral:** `Etapas 0, 1 e 2 concluídas — Etapa 3 a seguir`
 **Última atualização:** 2026-07-30
 
 ---
@@ -35,6 +35,8 @@
 | D5 | **Ponto duvidoso vira `pending_review`, não erro** | Se o rosto bate com score no limiar ou nenhum sinal de localização apareceu, registra mesmo assim e sinaliza para o RH decidir. Bloquear o funcionário de bater ponto é pior que um registro para revisar. |
 | D6 | **Expo + EAS Build** no app React Native | A máquina de desenvolvimento é Windows: **não é possível compilar iOS localmente sem um Mac**. O EAS Build compila na nuvem e envia para o TestFlight. BLE, câmera e GPS funcionam via config plugins + dev client. |
 | D7 | **SQLAlchemy 2.0 async + Alembic + asyncpg** | Padrão atual do ecossistema FastAPI, migrações versionadas desde o começo. |
+| D8 | **Beacons Eddystone**, não iBeacon | Eddystone é advertisement BLE comum (service UUID `0xFEAA`, namespace 10 bytes + instance 6 bytes). Como não recebe tratamento especial do iOS, `react-native-ble-plx` lê nos dois sistemas — uma biblioteca só, sem código específico por plataforma. Resolve o R1. **Ressalva:** varredura em segundo plano no iOS é limitada; só o iBeacon (via CoreLocation) acorda um app encerrado. Não afeta o MVP, em que o funcionário abre o app para bater ponto, mas inviabiliza um futuro "ponto automático ao entrar no hangar" sem voltar ao iBeacon. **Mitigação na compra:** a maioria dos beacons transmite os dois formatos em paralelo (advertising interleaved) pelo mesmo preço — comprar assim mantém a porta aberta de graça. |
+| D9 | **Validar no Android primeiro**, iOS depois | Android permite sideload de APK sem custo nem aprovação, então o ciclo de teste é imediato. A conta Apple ($99/ano) só é comprada depois que o fluxo estiver provado em Android, evitando gastar antes de validar. Consequência: a Etapa 9 entrega Android primeiro e o iOS vira uma sub-etapa (9b). |
 
 ---
 
@@ -42,10 +44,10 @@
 
 | # | Risco | Impacto | Quando tratar |
 |---|---|---|---|
-| R1 | **iOS não entrega advertisement de iBeacon via CoreBluetooth.** O `react-native-ble-plx` citado no documento enxerga iBeacons no Android, mas o iOS filtra esses pacotes e só os expõe via CoreLocation (region monitoring, UUID precisa ser conhecido antecipadamente). | Sem tratar, o beacon simplesmente não funciona em iPhone — exatamente o problema que motivou largar o PWA. | **Antes de comprar o hardware.** Duas saídas: (a) beacons Eddystone / advertisement BLE genérico, que o `ble-plx` lê nos dois sistemas; (b) manter iBeacon e somar uma lib CoreLocation no iOS. O modelo de dados da Etapa 5 já guarda os dois formatos, então isso não trava o backend. |
+| R1 | ~~iOS não entrega advertisement de iBeacon via CoreBluetooth.~~ | — | ✅ **Resolvido pela decisão D8: Eddystone.** Ver a ressalva de background em D8. |
 | R2 | **Ler SSID/BSSID exige permissão de localização** (Android 10+) e a entitlement *Access WiFi Information* (iOS), que só vem com a conta paga Apple. | Fallback Wi-Fi silenciosamente vazio. | Etapa 9, ao configurar as permissões do app. |
 | R3 | **Liveness client-side é burlável** se o servidor confiar num booleano do app. | Foto do funcionário no celular de outro bate ponto. | Etapa 10 — o servidor precisa validar o desafio, não aceitar o veredito do cliente. |
-| R4 | **Conta Apple Developer ($99/ano) é pré-requisito de prazo**, aprovação não é instantânea. | Trava a distribuição iOS no fim do projeto. | Comprar já, em paralelo à Etapa 1. |
+| R4 | **Conta Apple Developer ($99/ano) não é aprovada na hora** (validação da Apple leva de dias a semanas, e mais ainda para conta de organização, que exige D-U-N-S). | Atrasa a distribuição iOS. | **Decisão do time:** validar o fluxo no Android primeiro e só então comprar. Compensa o risco começando o cadastro da conta assim que o Android bater ponto de ponta a ponta — não esperar a Etapa 12. |
 | R5 | Imagem do backend com InsightFace passa de 1 GB (onnxruntime + modelos). | Build lento, deploy caro em plano free. | Etapa 3 — multi-stage build e baixar o modelo em volume, não na imagem. |
 
 ---
@@ -225,9 +227,29 @@ Postgres + API respondendo.
   com timeout por etapa e feedback do que foi detectado
 - Envio com fila offline e retry (hangar tem ponto cego de sinal)
 - Histórico dos próprios registros
+- **Android primeiro** (D9): APK por sideload, ciclo de teste imediato e sem custo
 - Textos de consentimento LGPD e telas de permissão
 
-**Critério de pronto:** APK instalado num Android físico batendo ponto contra o backend, detectando beacon de verdade.
+**Critério de pronto:** APK instalado num Android físico batendo ponto contra o backend, detectando beacon Eddystone de verdade.
+
+> **Portão de decisão (D9):** com o Android validado, comprar a conta Apple
+> Developer e seguir para a 9b. Não comprar antes — e não deixar para a Etapa 12,
+> porque a aprovação leva dias (R4).
+
+---
+
+## Etapa 9b — Paridade no iOS
+
+**Objetivo:** o mesmo app rodando em iPhone.
+
+**Entregáveis**
+- Conta Apple Developer ativa e certificados no EAS
+- Build iOS via EAS (sem Mac, decisão D6) e distribuição por TestFlight
+- Entitlement *Access WiFi Information* solicitada e configurada (R2)
+- Validar a varredura Eddystone em iPhone físico — é o ponto que motivou D8
+- Ajustar as telas de permissão ao texto que a Apple exige
+
+**Critério de pronto:** funcionário instala pelo TestFlight num iPhone e bate ponto detectando o mesmo beacon que o Android detecta.
 
 ---
 
@@ -293,9 +315,13 @@ Postgres + API respondendo.
 - 11 e 12 podem começar em paralelo assim que a 9 estiver de pé.
 
 **Em paralelo, fora do código (não deixar para o fim):**
-- Comprar a conta Apple Developer — R4
-- Escolher e comprar os beacons, resolvendo o R1 antes da compra
+- **Comprar os beacons Eddystone** (D8). Pedir explicitamente suporte a
+  *Eddystone-UID*; se o modelo transmitir Eddystone e iBeacon ao mesmo tempo pelo
+  mesmo preço, preferir esse — é seguro grátis caso um dia o iOS precise de
+  detecção em segundo plano.
 - Mapear fisicamente o hangar para posicionar os beacons
+- Conta Apple Developer: **só depois** do Android validado (D9), mas iniciar o
+  cadastro no mesmo dia em que ele for validado — a aprovação leva dias (R4)
 
 ---
 
@@ -305,14 +331,15 @@ Postgres + API respondendo.
 |---|---|---|
 | 0 — Fundação | 🟢 concluída | 2026-07-30 |
 | 1 — Modelo de dados | 🟢 concluída | 2026-07-30 |
-| 2 — Auth e tenancy | ⚪ não iniciada | |
+| 2 — Auth e tenancy | 🟢 concluída | 2026-07-30 |
 | 3 — Módulo facial | ⚪ não iniciada | |
 | 4 — Cadastro e enrollment | ⚪ não iniciada | |
 | 5 — Locais e beacons | ⚪ não iniciada | |
 | 6 — Validação de localização | ⚪ não iniciada | |
 | 7 — Bater ponto | ⚪ não iniciada | |
 | 8 — Painel admin | ⚪ não iniciada | |
-| 9 — App do funcionário | ⚪ não iniciada | |
+| 9 — App do funcionário (Android) | ⚪ não iniciada | |
+| 9b — Paridade no iOS | ⚪ não iniciada | |
 | 10 — Liveness | ⚪ não iniciada | |
 | 11 — LGPD | ⚪ não iniciada | |
 | 12 — Deploy | ⚪ não iniciada | |

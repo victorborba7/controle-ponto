@@ -9,10 +9,8 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    JSON,
     Boolean,
     DateTime,
-    Enum,
     Float,
     ForeignKey,
     Index,
@@ -26,6 +24,7 @@ from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin
+from app.db.types import enum_column
 from app.models.enums import EntryType, LocationMethod, TimeEntryStatus
 
 
@@ -55,7 +54,7 @@ class TimeEntry(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
     )
 
     entry_type: Mapped[EntryType] = mapped_column(
-        Enum(EntryType, name="entry_type", native_enum=False, length=20),
+        enum_column(EntryType, "entry_type", length=20),
         nullable=False,
     )
 
@@ -84,7 +83,7 @@ class TimeEntry(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
     # --- Evidencia de localizacao ---
     # Requisito explicito do projeto: todo ponto guarda qual metodo validou.
     location_method: Mapped[LocationMethod] = mapped_column(
-        Enum(LocationMethod, name="location_method", native_enum=False, length=20),
+        enum_column(LocationMethod, "location_method", length=20),
         nullable=False,
         default=LocationMethod.NONE,
     )
@@ -109,14 +108,11 @@ class TimeEntry(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
     # Payload cru de localizacao que o app enviou (todos os beacons vistos,
     # redes, GPS). Preservado para auditoria e para reavaliar um registro
     # contestado com a regra que valia na epoca.
-    # JSONB no Postgres, JSON no resto (o SQLite dos testes nao tem JSONB).
-    location_raw: Mapped[dict | None] = mapped_column(
-        JSONB().with_variant(JSON(), "sqlite"), nullable=True
-    )
+    location_raw: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     # --- Desfecho ---
     status: Mapped[TimeEntryStatus] = mapped_column(
-        Enum(TimeEntryStatus, name="time_entry_status", native_enum=False, length=20),
+        enum_column(TimeEntryStatus, "time_entry_status", length=20),
         nullable=False,
         default=TimeEntryStatus.PENDING_REVIEW,
     )

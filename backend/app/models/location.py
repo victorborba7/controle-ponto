@@ -8,7 +8,6 @@ import uuid
 
 from sqlalchemy import (
     Boolean,
-    Enum,
     Float,
     ForeignKey,
     Index,
@@ -20,6 +19,7 @@ from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin
+from app.db.types import enum_column
 from app.models.enums import BeaconProtocol
 
 
@@ -86,7 +86,7 @@ class Beacon(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
     label: Mapped[str] = mapped_column(String(200), nullable=False)
 
     protocol: Mapped[BeaconProtocol] = mapped_column(
-        Enum(BeaconProtocol, name="beacon_protocol", native_enum=False, length=20),
+        enum_column(BeaconProtocol, "beacon_protocol", length=20),
         nullable=False,
     )
 

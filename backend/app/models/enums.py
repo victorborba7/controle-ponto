@@ -7,6 +7,17 @@ como texto legivel no banco (facilita inspecao manual e relatorio do RH).
 from enum import StrEnum
 
 
+class SubjectType(StrEnum):
+    """Quem esta autenticado.
+
+    Os dois publicos vivem em tabelas diferentes (users x employees) e tem
+    permissoes disjuntas: admin opera o painel, funcionario bate ponto.
+    """
+
+    USER = "user"
+    EMPLOYEE = "employee"
+
+
 class UserRole(StrEnum):
     """Papel de quem acessa o painel administrativo."""
 

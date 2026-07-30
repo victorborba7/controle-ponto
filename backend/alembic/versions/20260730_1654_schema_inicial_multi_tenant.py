@@ -2,15 +2,15 @@
 
 Revision ID: 0002_initial_schema
 Revises: 0001_pgvector
-Create Date: 2026-07-30 16:31:55.967149+00:00
+Create Date: 2026-07-30 16:54:23.642017+00:00
 
 """
 from collections.abc import Sequence
 
-import pgvector.sqlalchemy
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
+import pgvector.sqlalchemy
 
 revision: str = '0002_initial_schema'
 down_revision: str | None = '0001_pgvector'
@@ -37,7 +37,7 @@ def upgrade() -> None:
     sa.Column('actor_type', sa.String(length=20), nullable=False),
     sa.Column('actor_id', sa.UUID(), nullable=True),
     sa.Column('actor_label', sa.String(length=200), nullable=True),
-    sa.Column('action', sa.Enum('CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGIN_FAILED', 'TIME_ENTRY', 'REVIEW', 'CONSENT_GRANTED', 'CONSENT_REVOKED', name='audit_action', native_enum=False, length=30), nullable=False),
+    sa.Column('action', sa.Enum('create', 'update', 'delete', 'login', 'login_failed', 'time_entry', 'review', 'consent_granted', 'consent_revoked', name='audit_action', native_enum=False, length=30), nullable=False),
     sa.Column('entity_type', sa.String(length=60), nullable=True),
     sa.Column('entity_id', sa.UUID(), nullable=True),
     sa.Column('payload', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
@@ -73,7 +73,7 @@ def upgrade() -> None:
     sa.Column('email', sa.String(length=255), nullable=False),
     sa.Column('password_hash', sa.String(length=255), nullable=False),
     sa.Column('name', sa.String(length=200), nullable=False),
-    sa.Column('role', sa.Enum('OWNER', 'HR', 'VIEWER', name='user_role', native_enum=False, length=20), nullable=False),
+    sa.Column('role', sa.Enum('owner', 'hr', 'viewer', name='user_role', native_enum=False, length=20), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('last_login_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('id', sa.UUID(), nullable=False),
@@ -89,7 +89,7 @@ def upgrade() -> None:
     op.create_table('beacons',
     sa.Column('site_id', sa.UUID(), nullable=False),
     sa.Column('label', sa.String(length=200), nullable=False),
-    sa.Column('protocol', sa.Enum('IBEACON', 'EDDYSTONE', name='beacon_protocol', native_enum=False, length=20), nullable=False),
+    sa.Column('protocol', sa.Enum('ibeacon', 'eddystone', name='beacon_protocol', native_enum=False, length=20), nullable=False),
     sa.Column('ibeacon_uuid', sa.String(length=36), nullable=True),
     sa.Column('ibeacon_major', sa.Integer(), nullable=True),
     sa.Column('ibeacon_minor', sa.Integer(), nullable=True),
@@ -119,7 +119,7 @@ def upgrade() -> None:
     sa.Column('password_hash', sa.String(length=255), nullable=True),
     sa.Column('must_change_password', sa.Boolean(), nullable=False),
     sa.Column('last_login_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('status', sa.Enum('ACTIVE', 'INACTIVE', 'SUSPENDED', name='employee_status', native_enum=False, length=20), nullable=False),
+    sa.Column('status', sa.Enum('active', 'inactive', 'suspended', name='employee_status', native_enum=False, length=20), nullable=False),
     sa.Column('hired_at', sa.Date(), nullable=True),
     sa.Column('terminated_at', sa.Date(), nullable=True),
     sa.Column('default_site_id', sa.UUID(), nullable=True),
@@ -154,7 +154,7 @@ def upgrade() -> None:
     op.create_index('ix_wifi_tenant_site', 'wifi_networks', ['tenant_id', 'site_id', 'is_active'], unique=False)
     op.create_table('consents',
     sa.Column('employee_id', sa.UUID(), nullable=False),
-    sa.Column('consent_type', sa.Enum('BIOMETRIC', 'LOCATION', name='consent_type', native_enum=False, length=20), nullable=False),
+    sa.Column('consent_type', sa.Enum('biometric', 'location', name='consent_type', native_enum=False, length=20), nullable=False),
     sa.Column('policy_version', sa.String(length=20), nullable=False),
     sa.Column('policy_text_hash', sa.String(length=64), nullable=True),
     sa.Column('granted_at', sa.DateTime(timezone=True), nullable=False),
@@ -174,7 +174,7 @@ def upgrade() -> None:
     op.create_table('devices',
     sa.Column('employee_id', sa.UUID(), nullable=False),
     sa.Column('device_fingerprint', sa.String(length=255), nullable=False),
-    sa.Column('platform', sa.Enum('ANDROID', 'IOS', name='device_platform', native_enum=False, length=20), nullable=False),
+    sa.Column('platform', sa.Enum('android', 'ios', name='device_platform', native_enum=False, length=20), nullable=False),
     sa.Column('model', sa.String(length=120), nullable=True),
     sa.Column('os_version', sa.String(length=50), nullable=True),
     sa.Column('app_version', sa.String(length=30), nullable=True),
@@ -211,10 +211,31 @@ def upgrade() -> None:
     )
     op.create_index('ix_face_templates_tenant_employee', 'face_templates', ['tenant_id', 'employee_id', 'is_active'], unique=False)
     op.create_index(op.f('ix_face_templates_tenant_id'), 'face_templates', ['tenant_id'], unique=False)
+    op.create_table('refresh_tokens',
+    sa.Column('token_hash', sa.String(length=64), nullable=False),
+    sa.Column('subject_type', sa.Enum('user', 'employee', name='subject_type', native_enum=False, length=20), nullable=False),
+    sa.Column('subject_id', sa.UUID(), nullable=False),
+    sa.Column('device_id', sa.UUID(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('revoked_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('replaced_by_id', sa.UUID(), nullable=True),
+    sa.Column('created_ip', sa.String(length=45), nullable=True),
+    sa.Column('user_agent', sa.String(length=400), nullable=True),
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('tenant_id', sa.UUID(), nullable=False),
+    sa.ForeignKeyConstraint(['device_id'], ['devices.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['replaced_by_id'], ['refresh_tokens.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('ix_refresh_tokens_subject', 'refresh_tokens', ['tenant_id', 'subject_type', 'subject_id'], unique=False)
+    op.create_index(op.f('ix_refresh_tokens_tenant_id'), 'refresh_tokens', ['tenant_id'], unique=False)
+    op.create_index(op.f('ix_refresh_tokens_token_hash'), 'refresh_tokens', ['token_hash'], unique=True)
     op.create_table('time_entries',
     sa.Column('employee_id', sa.UUID(), nullable=False),
     sa.Column('device_id', sa.UUID(), nullable=True),
-    sa.Column('entry_type', sa.Enum('IN', 'OUT', 'BREAK_START', 'BREAK_END', name='entry_type', native_enum=False, length=20), nullable=False),
+    sa.Column('entry_type', sa.Enum('in', 'out', 'break_start', 'break_end', name='entry_type', native_enum=False, length=20), nullable=False),
     sa.Column('recorded_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('client_recorded_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('face_match_score', sa.Float(), nullable=True),
@@ -222,7 +243,7 @@ def upgrade() -> None:
     sa.Column('liveness_passed', sa.Boolean(), nullable=True),
     sa.Column('liveness_score', sa.Float(), nullable=True),
     sa.Column('selfie_image_key', sa.String(length=500), nullable=True),
-    sa.Column('location_method', sa.Enum('BEACON', 'WIFI', 'GPS', 'NONE', name='location_method', native_enum=False, length=20), nullable=False),
+    sa.Column('location_method', sa.Enum('beacon', 'wifi', 'gps', 'none', name='location_method', native_enum=False, length=20), nullable=False),
     sa.Column('location_confidence', sa.Float(), nullable=True),
     sa.Column('site_id', sa.UUID(), nullable=True),
     sa.Column('beacon_id', sa.UUID(), nullable=True),
@@ -233,7 +254,7 @@ def upgrade() -> None:
     sa.Column('gps_accuracy_m', sa.Float(), nullable=True),
     sa.Column('distance_to_site_m', sa.Float(), nullable=True),
     sa.Column('location_raw', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('status', sa.Enum('APPROVED', 'PENDING_REVIEW', 'REJECTED', name='time_entry_status', native_enum=False, length=20), nullable=False),
+    sa.Column('status', sa.Enum('approved', 'pending_review', 'rejected', name='time_entry_status', native_enum=False, length=20), nullable=False),
     sa.Column('decision_reason', sa.Text(), nullable=True),
     sa.Column('reviewed_by_user_id', sa.UUID(), nullable=True),
     sa.Column('reviewed_at', sa.DateTime(timezone=True), nullable=True),
@@ -268,6 +289,10 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_time_entries_tenant_id'), table_name='time_entries')
     op.drop_index('ix_time_entries_tenant_employee_time', table_name='time_entries')
     op.drop_table('time_entries')
+    op.drop_index(op.f('ix_refresh_tokens_token_hash'), table_name='refresh_tokens')
+    op.drop_index(op.f('ix_refresh_tokens_tenant_id'), table_name='refresh_tokens')
+    op.drop_index('ix_refresh_tokens_subject', table_name='refresh_tokens')
+    op.drop_table('refresh_tokens')
     op.drop_index(op.f('ix_face_templates_tenant_id'), table_name='face_templates')
     op.drop_index('ix_face_templates_tenant_employee', table_name='face_templates')
     op.drop_table('face_templates')
