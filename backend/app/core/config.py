@@ -32,11 +32,22 @@ class Settings(BaseSettings):
     access_token_ttl_minutes: int = 30
     refresh_token_ttl_days: int = 30
 
-    # --- Reconhecimento facial (Etapa 3) ---
-    # "stub" nao baixa modelo nenhum: e o padrao ate a engine real entrar.
+    # --- Reconhecimento facial ---
+    # "stub" nao baixa modelo nenhum e e o padrao em desenvolvimento e testes.
+    # "insightface" exige a imagem com requirements-facial.txt.
     face_engine: Literal["stub", "insightface"] = "stub"
+    # Similaridade de cosseno sobre embeddings ArcFace normalizados.
+    # Acima de match_threshold aprova; entre os dois manda para revisao do RH
+    # (decisao D5); abaixo de review_threshold rejeita.
     face_match_threshold: float = 0.40
     face_review_threshold: float = 0.32
+    # Quantas fotos o cadastro exige (decisao D4: varias absorvem mudanca de
+    # luz, oculos e barba sem recadastro).
+    face_min_enrollment_images: int = 3
+    face_max_enrollment_images: int = 5
+
+    # --- Armazenamento de imagens ---
+    storage_path: str = "/app/storage"
 
     # --- CORS ---
     cors_origins: list[str] = ["http://localhost:3000"]

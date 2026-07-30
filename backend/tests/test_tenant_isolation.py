@@ -24,9 +24,6 @@ from tests.conftest import (
     login_admin,
 )
 
-# Mesmo event loop das fixtures de sessao (ver pyproject.toml).
-pytestmark = pytest.mark.asyncio(loop_scope="session")
-
 
 @pytest.fixture
 async def two_tenants(db: AsyncSession):

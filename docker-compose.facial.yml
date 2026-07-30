@@ -1,0 +1,21 @@
+# Sobreposicao que troca a API pela imagem com o reconhecimento facial real.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.facial.yml up -d --build api
+#
+# Usar quando for preciso exercitar o modelo de verdade (enrollment com foto
+# real, conferir limiar). O dia a dia roda com o compose padrao e a engine
+# stub, que nao baixa modelo nenhum.
+
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.facial
+    environment:
+      FACE_ENGINE: insightface
+    volumes:
+      - ./backend:/app
+      # Onde o InsightFace procura e grava os pesos baixados. Volume nomeado
+      # para o download de ~300 MB acontecer uma vez so, e nao a cada
+      # recriacao do container.
+      - facemodels:/root/.insightface

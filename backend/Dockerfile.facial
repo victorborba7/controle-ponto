@@ -1,0 +1,59 @@
+# Imagem com o reconhecimento facial real (InsightFace + onnxruntime).
+#
+# Separada da imagem padrao de proposito (risco R5): as libs somam ~1 GB e
+# tornariam lento o ciclo de desenvolvimento das etapas que nao dependem do
+# modelo. O ciclo normal usa o Dockerfile com FACE_ENGINE=stub.
+#
+# Subir esta variante:
+#   docker compose -f docker-compose.yml -f docker-compose.facial.yml up -d --build api
+#
+# O modelo (buffalo_l, ~300 MB) NAO vai na imagem: e baixado no primeiro uso
+# para o volume `facemodels`. Empacota-lo faria cada deploy transferir 1,3 GB.
+
+# --------------------------------------------------------------------------
+# Estagio de build
+# --------------------------------------------------------------------------
+# O insightface nao publica wheel pronto: o pacote traz extensoes em C++ que
+# precisam ser compiladas na instalacao. Compilar aqui e copiar so o resultado
+# mantem o compilador (~300 MB de toolchain) fora da imagem final.
+FROM python:3.12-slim AS builder
+
+ENV PIP_NO_CACHE_DIR=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY requirements.txt requirements-dev.txt requirements-facial.txt ./
+
+# Cython e numpy precisam existir ANTES: o setup.py do insightface os importa
+# durante a propria compilacao.
+RUN pip install --upgrade pip \
+    && pip install --prefix=/install cython numpy \
+    && pip install --prefix=/install -r requirements-dev.txt \
+    && PYTHONPATH=/install/lib/python3.12/site-packages \
+       pip install --prefix=/install -r requirements-facial.txt
+
+# --------------------------------------------------------------------------
+# Imagem final
+# --------------------------------------------------------------------------
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+# libgomp1: runtime OpenMP exigido pelo onnxruntime.
+# libglib2.0-0: exigido pelo OpenCV mesmo na variante headless.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /install /usr/local
+
+WORKDIR /app
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

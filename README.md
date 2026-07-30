@@ -75,6 +75,34 @@ docker compose exec api pytest          # tudo
 docker compose exec api pytest -q tests/test_tenant_isolation.py
 ```
 
+### Reconhecimento facial
+
+Duas implementações atrás da mesma interface (`app/facial/base.py`). Nada fora
+de [backend/app/facial/](backend/app/facial/) importa `insightface` — é o que
+permitirá, na fase edge, mover a inferência para o aparelho sem reescrever o
+backend.
+
+| Engine | Quando usar | Custo |
+|---|---|---|
+| `stub` (padrão) | Desenvolvimento e testes | Nenhum |
+| `insightface` | Validar com rosto de verdade | ~1 GB de libs + ~300 MB de modelo |
+
+A engine stub trata a **cor dominante da imagem como identidade** — cores
+próximas são a mesma pessoa, cores distantes são pessoas diferentes. Isso
+permite testar toda a canalização (limiares, escolha de template, erros) sem
+baixar modelo. Ela não testa o modelo; isso é feito separadamente.
+
+Para rodar com o modelo real:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.facial.yml up -d --build api
+docker compose -f docker-compose.yml -f docker-compose.facial.yml \
+    exec api pytest tests/test_facial_real_model.py -v
+```
+
+O modelo é baixado no primeiro uso para o volume `facemodels`, não empacotado
+na imagem — senão cada deploy transferiria 1,3 GB.
+
 ### Credenciais do seed
 
 Só para desenvolvimento local: admin `rh@empresademo.com.br` e funcionários

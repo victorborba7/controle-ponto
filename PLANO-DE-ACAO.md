@@ -3,7 +3,7 @@
 > Documento de execução. O "o quê" e o "porquê" estão em [CLAUDE.MD](CLAUDE.MD).
 > Aqui está o **como** e em **que ordem**.
 
-**Status geral:** `Etapas 0, 1 e 2 concluídas — Etapa 3 a seguir`
+**Status geral:** `Etapas 0 a 3 concluídas — Etapa 4 a seguir`
 **Última atualização:** 2026-07-30
 
 ---
@@ -48,7 +48,7 @@
 | R2 | **Ler SSID/BSSID exige permissão de localização** (Android 10+) e a entitlement *Access WiFi Information* (iOS), que só vem com a conta paga Apple. | Fallback Wi-Fi silenciosamente vazio. | Etapa 9, ao configurar as permissões do app. |
 | R3 | **Liveness client-side é burlável** se o servidor confiar num booleano do app. | Foto do funcionário no celular de outro bate ponto. | Etapa 10 — o servidor precisa validar o desafio, não aceitar o veredito do cliente. |
 | R4 | **Conta Apple Developer ($99/ano) não é aprovada na hora** (validação da Apple leva de dias a semanas, e mais ainda para conta de organização, que exige D-U-N-S). | Atrasa a distribuição iOS. | **Decisão do time:** validar o fluxo no Android primeiro e só então comprar. Compensa o risco começando o cadastro da conta assim que o Android bater ponto de ponta a ponta — não esperar a Etapa 12. |
-| R5 | Imagem do backend com InsightFace passa de 1 GB (onnxruntime + modelos). | Build lento, deploy caro em plano free. | Etapa 3 — multi-stage build e baixar o modelo em volume, não na imagem. |
+| R5 | ~~Imagem do backend com InsightFace passa de 1 GB.~~ | — | ✅ **Tratado na Etapa 3.** Imagem separada (`Dockerfile.facial`), multi-stage deixando o compilador fora da final, e modelo em volume. O ciclo de desenvolvimento roda com a engine stub, sem nenhum desses custos. **Descoberta:** o `insightface` não publica wheel — exige compilar C++ na instalação, o que é justamente o que inviabilizava rodar no Windows (D1) e o que motiva o estágio de build separado. |
 
 ---
 
@@ -122,9 +122,19 @@ Postgres + API respondendo.
 - `StubFaceEngine` — determinística, para testes e CI sem baixar 300 MB
 - Seleção da engine por variável de ambiente
 - Serviço de storage abstrato (`LocalStorage` no MVP → `S3Storage` na fase 2), com chaves opacas
-- Validação de qualidade da foto: um rosto só, tamanho mínimo, nitidez, frontalidade
+- Validação de qualidade da foto: um rosto só, tamanho mínimo, nitidez, rosto não cortado
+- `AsyncFaceEngine` — despacha a inferência para uma thread; chamada direta de um
+  endpoint `async` congelaria o event loop por centenas de milissegundos
 
 **Critério de pronto:** teste que gera embedding de duas fotos da mesma pessoa e de pessoas diferentes, confirmando que o limiar separa os casos.
+
+> **Nota sobre a suíte de testes.** Ficou dividida em dois níveis, e a distinção
+> importa: `test_facial.py` roda com a engine stub e verifica a *canalização*
+> (limiares, escolha de template, qualidade, erros) — não diz nada sobre o
+> modelo. Quem responde "o ArcFace separa duas pessoas?" é
+> `test_facial_real_model.py`, que exige a imagem `Dockerfile.facial` e é pulado
+> quando ela não está em uso. Confundir os dois seria concluir, do verde da
+> suíte padrão, algo que ela não testa.
 
 ---
 
@@ -332,7 +342,7 @@ Postgres + API respondendo.
 | 0 — Fundação | 🟢 concluída | 2026-07-30 |
 | 1 — Modelo de dados | 🟢 concluída | 2026-07-30 |
 | 2 — Auth e tenancy | 🟢 concluída | 2026-07-30 |
-| 3 — Módulo facial | ⚪ não iniciada | |
+| 3 — Módulo facial | 🟢 concluída | 2026-07-30 |
 | 4 — Cadastro e enrollment | ⚪ não iniciada | |
 | 5 — Locais e beacons | ⚪ não iniciada | |
 | 6 — Validação de localização | ⚪ não iniciada | |

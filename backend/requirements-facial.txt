@@ -1,8 +1,15 @@
-# Reconhecimento facial — entra na Etapa 3.
-# Separado do requirements.txt porque soma ~1GB e deixaria o build de dev lento.
-# O modelo (buffalo_l, ~300MB) NAO vai na imagem: e baixado para um volume no primeiro uso.
+# Reconhecimento facial real — usado apenas pela imagem Dockerfile.facial.
+#
+# Separado do requirements.txt porque soma ~1GB e deixaria lento o ciclo de
+# desenvolvimento das etapas que rodam com a engine stub.
+#
+# O modelo (buffalo_l, ~300MB) NAO esta aqui: e baixado no primeiro uso para
+# um volume, nao empacotado na imagem.
+#
+# O mediapipe (liveness/anti-spoofing) entra na Etapa 10, quando for usado —
+# declarar antes so tornaria este build mais lento e mais fragil.
+
 insightface==0.7.3
 onnxruntime==1.20.1
 opencv-python-headless==4.10.0.84
 numpy==1.26.4
-mediapipe==0.10.18
