@@ -14,6 +14,7 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -64,16 +65,31 @@ class Beacon(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
     __tablename__ = "beacons"
     __table_args__ = (
         Index("ix_beacons_tenant_site", "tenant_id", "site_id", "is_active"),
-        # Um mesmo beacon fisico nao pode ser cadastrado duas vezes no tenant.
-        UniqueConstraint(
+        # Um indice parcial por protocolo, e nao uma UniqueConstraint unica
+        # sobre todas as colunas de identificador.
+        #
+        # O motivo e uma armadilha do Postgres: em restricao de unicidade, NULL
+        # e considerado distinto de qualquer outro NULL. Uma constraint sobre
+        # (tenant, protocol, ibeacon_*, eddystone_*) portanto NAO impede dois
+        # beacons Eddystone identicos — as colunas de iBeacon ficam nulas nos
+        # dois e as linhas passam como diferentes. Cada indice abaixo cobre
+        # apenas as colunas que aquele protocolo de fato usa.
+        Index(
+            "uq_beacons_eddystone",
             "tenant_id",
-            "protocol",
+            "eddystone_namespace",
+            "eddystone_instance",
+            unique=True,
+            postgresql_where=text("protocol = 'eddystone'"),
+        ),
+        Index(
+            "uq_beacons_ibeacon",
+            "tenant_id",
             "ibeacon_uuid",
             "ibeacon_major",
             "ibeacon_minor",
-            "eddystone_namespace",
-            "eddystone_instance",
-            name="uq_beacons_tenant_identifier",
+            unique=True,
+            postgresql_where=text("protocol = 'ibeacon'"),
         ),
     )
 

@@ -5,6 +5,7 @@ física (beacon BLE → Wi-Fi → GPS).
 
 - **Visão do produto e stack:** [CLAUDE.MD](CLAUDE.MD)
 - **Plano de execução por etapas:** [PLANO-DE-ACAO.md](PLANO-DE-ACAO.md)
+- **Instalação e cadastro dos beacons:** [docs/mapeamento-beacons.md](docs/mapeamento-beacons.md)
 
 ## Estrutura
 

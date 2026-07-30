@@ -3,7 +3,7 @@
 > Documento de execução. O "o quê" e o "porquê" estão em [CLAUDE.MD](CLAUDE.MD).
 > Aqui está o **como** e em **que ordem**.
 
-**Status geral:** `Etapas 0 a 4 concluídas — Etapa 5 a seguir`
+**Status geral:** `Etapas 0 a 5 concluídas — Etapa 6 a seguir`
 **Última atualização:** 2026-07-30
 
 ---
@@ -171,8 +171,22 @@ Postgres + API respondendo.
 - CRUD de `wifi_networks` — SSID + BSSID por site
 - `GET /sites/{id}/location-config` — o app baixa e cacheia os identificadores válidos
 - Documento `docs/mapeamento-beacons.md` — planta de onde cada beacon fica no hangar
+- **Normalização de identificadores na entrada** — hex em minúsculas sem separadores,
+  BSSID canônico, UUID canônico
 
 **Critério de pronto:** um site com 2 beacons e 1 rede Wi-Fi cadastrados e retornados pelo endpoint de config.
+
+> **Por que a normalização virou o centro desta etapa.** Um beacon cadastrado
+> como `EDD1EBEA...` e reportado pelo aparelho como `edd1ebea...` nunca casa — e
+> a falha é silenciosa: nada dá erro, o beacon simplesmente nunca é reconhecido.
+> Descobrir isso seria uma visita ao hangar com alguém parado sem conseguir bater
+> ponto. Converter tudo para uma forma canônica na entrada custa 40 linhas.
+
+> **Os identificadores em `location-config` não são segredo, e não teriam como
+> ser.** Advertisement BLE é transmissão pública: qualquer aparelho ao alcance
+> lê com um app de varredura comum. Escondê-los do app não atrapalharia quem já
+> esteve no hangar uma vez — só o uso legítimo. A defesa contra fraude é rosto,
+> liveness e auditoria.
 
 ---
 
@@ -351,7 +365,7 @@ Postgres + API respondendo.
 | 2 — Auth e tenancy | 🟢 concluída | 2026-07-30 |
 | 3 — Módulo facial | 🟢 concluída | 2026-07-30 |
 | 4 — Cadastro e enrollment | 🟢 concluída | 2026-07-30 |
-| 5 — Locais e beacons | ⚪ não iniciada | |
+| 5 — Locais e beacons | 🟢 concluída | 2026-07-30 |
 | 6 — Validação de localização | ⚪ não iniciada | |
 | 7 — Bater ponto | ⚪ não iniciada | |
 | 8 — Painel admin | ⚪ não iniciada | |
