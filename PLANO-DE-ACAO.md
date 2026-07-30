@@ -3,7 +3,7 @@
 > Documento de execução. O "o quê" e o "porquê" estão em [CLAUDE.MD](CLAUDE.MD).
 > Aqui está o **como** e em **que ordem**.
 
-**Status geral:** `Etapas 0 a 5 concluídas — Etapa 6 a seguir`
+**Status geral:** `Etapas 0 a 6 concluídas — Etapa 7 a seguir (fecha o backend)`
 **Última atualização:** 2026-07-30
 
 ---
@@ -204,8 +204,17 @@ Postgres + API respondendo.
 - Resultado tipado: método, confiança, site, identificador que casou, motivo
 - Payload cru guardado em `jsonb` para auditoria
 - Testes de mesa cobrindo cada ramo e as fronteiras (RSSI fraco, GPS impreciso, spoof)
+- **Cruzamento de sinais** — beacon que confirma o hangar enquanto o GPS aponta
+  outra cidade é sinalizado como incoerência
 
 **Critério de pronto:** testes unitários cobrindo os quatro desfechos da cadeia.
+
+> **A cadeia é uma função pura sobre um retrato do cadastro.** Não toca banco,
+> não lê relógio, não chama rede — o carregador que traz os dados vive em
+> `services/location.py`. É o que permite exercitar em milissegundos as
+> fronteiras caras de reproduzir no hangar: sinal exatamente no limiar, GPS
+> impreciso demais, sinais que se contradizem. Um teste de integração separado
+> cobre a costura com o banco.
 
 ---
 
@@ -366,7 +375,7 @@ Postgres + API respondendo.
 | 3 — Módulo facial | 🟢 concluída | 2026-07-30 |
 | 4 — Cadastro e enrollment | 🟢 concluída | 2026-07-30 |
 | 5 — Locais e beacons | 🟢 concluída | 2026-07-30 |
-| 6 — Validação de localização | ⚪ não iniciada | |
+| 6 — Validação de localização | 🟢 concluída | 2026-07-30 |
 | 7 — Bater ponto | ⚪ não iniciada | |
 | 8 — Painel admin | ⚪ não iniciada | |
 | 9 — App do funcionário (Android) | ⚪ não iniciada | |

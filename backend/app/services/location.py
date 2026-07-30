@@ -18,6 +18,7 @@ from app.schemas.location import (
     WifiNetworkCreate,
     WifiNetworkUpdate,
 )
+from app.services.location_validator import SiteRegistry
 
 
 class LocationError(Exception):
@@ -222,6 +223,24 @@ async def count_children(session: AsyncSession, site: Site) -> tuple[int, int]:
         .where(WifiNetwork.site_id == site.id, WifiNetwork.is_active.is_(True))
     )
     return (beacons or 0), (networks or 0)
+
+
+async def load_registry(repo: TenantRepository) -> SiteRegistry:
+    """Retrato do cadastro da empresa, para a cadeia de validacao decidir.
+
+    Carregado de uma vez, e nao consultado elo a elo: sao poucas dezenas de
+    linhas mesmo numa empresa grande, e uma unica ida ao banco por batida e
+    melhor que tres. E o que permite a cadeia ser uma funcao pura.
+    """
+    sites = await repo.session.execute(repo.query(Site))
+    beacons = await repo.session.execute(repo.query(Beacon))
+    networks = await repo.session.execute(repo.query(WifiNetwork))
+
+    return SiteRegistry(
+        sites=tuple(sites.scalars().all()),
+        beacons=tuple(beacons.scalars().all()),
+        wifi_networks=tuple(networks.scalars().all()),
+    )
 
 
 def config_version(

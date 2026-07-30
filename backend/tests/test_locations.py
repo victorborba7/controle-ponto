@@ -570,6 +570,79 @@ async def test_local_de_outra_empresa_responde_404(
     assert response.status_code == 404
 
 
+async def test_cadeia_de_validacao_funciona_com_dados_reais_do_banco(
+    client: AsyncClient, db: AsyncSession, empresa: dict, site_completo: dict
+):
+    """Costura o cadastro real com a cadeia de validacao.
+
+    Os testes da cadeia sao de mesa e montam o cadastro na mao. Este aqui cobre
+    o unico trecho que eles nao alcancam: o carregador que traz do banco o que
+    a cadeia recebe. Um erro ali (filtro de tenant faltando, campo mapeado
+    errado) passaria despercebido pelos dois lados.
+    """
+    from app.db.repository import TenantRepository
+    from app.models.enums import LocationMethod
+    from app.schemas.evidence import BeaconReading, LocationEvidence
+    from app.services.location import load_registry
+    from app.services.location_validator import validate_location
+
+    repo = TenantRepository(db, empresa["tenant"].id)
+    registry = await load_registry(repo)
+
+    assert len(registry.beacons) == 2
+    assert len(registry.wifi_networks) == 1
+
+    veredito = validate_location(
+        LocationEvidence(
+            beacons=[
+                BeaconReading(
+                    protocol="eddystone",
+                    eddystone_namespace=NAMESPACE,
+                    eddystone_instance=INSTANCE_A,
+                    rssi=-60,
+                )
+            ]
+        ),
+        registry,
+    )
+
+    assert veredito.method is LocationMethod.BEACON
+    assert veredito.accepted
+    assert str(veredito.site_id) == site_completo["id"]
+
+
+async def test_registro_de_outra_empresa_nao_entra_na_cadeia(
+    client: AsyncClient, db: AsyncSession, empresa: dict, site_completo: dict
+):
+    """O beacon de um cliente nao pode confirmar presenca no local de outro."""
+    from app.db.repository import TenantRepository
+    from app.models.enums import LocationMethod
+    from app.schemas.evidence import BeaconReading, LocationEvidence
+    from app.services.location import load_registry
+    from app.services.location_validator import validate_location
+
+    outra = await create_tenant(db, slug="vizinha3")
+    await db.commit()
+
+    registry = await load_registry(TenantRepository(db, outra.id))
+
+    veredito = validate_location(
+        LocationEvidence(
+            beacons=[
+                BeaconReading(
+                    protocol="eddystone",
+                    eddystone_namespace=NAMESPACE,
+                    eddystone_instance=INSTANCE_A,
+                    rssi=-40,
+                )
+            ]
+        ),
+        registry,
+    )
+
+    assert veredito.method is LocationMethod.NONE
+
+
 async def test_mesmo_beacon_em_empresas_diferentes_e_permitido(
     client: AsyncClient, db: AsyncSession, empresa: dict, site: dict
 ):
