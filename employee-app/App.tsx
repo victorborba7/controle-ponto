@@ -7,13 +7,20 @@ import { encerrarSessao, lerPerfil, type Perfil } from "./src/services/api";
 import { encerrarBle } from "./src/services/localizacao";
 import { BaterPonto } from "./src/telas/BaterPonto";
 import { Consentimento, VERSAO_DO_TERMO } from "./src/telas/Consentimento";
+import { Diagnostico } from "./src/telas/Diagnostico";
 import { Historico } from "./src/telas/Historico";
 import { Login } from "./src/telas/Login";
 import { Legenda, cores } from "./src/ui";
 
 const CHAVE_CONSENTIMENTO = "ponto_consentimento_versao";
 
-type Tela = "carregando" | "consentimento" | "login" | "ponto" | "historico";
+type Tela =
+  | "carregando"
+  | "consentimento"
+  | "login"
+  | "ponto"
+  | "historico"
+  | "diagnostico";
 
 /**
  * Navegação por estado, sem biblioteca de rotas.
@@ -83,13 +90,22 @@ export default function App() {
             setPerfil(novo);
             setTela("ponto");
           }}
+          // Acessível sem login de propósito: na instalação, os beacons são
+          // mapeados antes de existir funcionário cadastrado — e quem faz esse
+          // trabalho é o técnico, não alguém com credencial de ponto.
+          aoAbrirDiagnostico={() => setTela("diagnostico")}
         />
+      )}
+
+      {tela === "diagnostico" && (
+        <Diagnostico aoVoltar={() => setTela(perfil ? "ponto" : "login")} />
       )}
 
       {tela === "ponto" && perfil && (
         <BaterPonto
           perfil={perfil}
           aoAbrirHistorico={() => setTela("historico")}
+          aoAbrirDiagnostico={() => setTela("diagnostico")}
           aoSair={sair}
         />
       )}

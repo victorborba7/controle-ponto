@@ -12,13 +12,20 @@ import {
   Carregando,
   Field,
   Input,
+  Select,
   Tabela,
   Td,
   Th,
   Vazio,
 } from "@/components/ui";
 import { api } from "@/lib/api";
-import type { Beacon, Paginated, SiteDetail, WifiNetwork } from "@/lib/types";
+import type {
+  Beacon,
+  BeaconProtocol,
+  Paginated,
+  SiteDetail,
+  WifiNetwork,
+} from "@/lib/types";
 
 export default function LocalPage() {
   const { id } = useParams<{ id: string }>();
@@ -29,6 +36,7 @@ export default function LocalPage() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [protocolo, setProtocolo] = useState<BeaconProtocol>("eddystone");
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -59,13 +67,27 @@ export default function LocalPage() {
 
     const form = new FormData(evento.currentTarget);
     const formulario = evento.currentTarget;
+    const texto = (campo: string) => String(form.get(campo) ?? "").trim();
+
+    // Cada protocolo usa só o seu conjunto de campos; enviar os do outro é
+    // recusado pelo backend, justamente para não gravar registro pela metade.
+    const identificador =
+      protocolo === "eddystone"
+        ? {
+            eddystone_namespace: texto("namespace"),
+            eddystone_instance: texto("instance"),
+          }
+        : {
+            ibeacon_uuid: texto("uuid"),
+            ibeacon_major: Number(form.get("major")),
+            ibeacon_minor: Number(form.get("minor")),
+          };
 
     try {
       await api.post(`/sites/${id}/beacons`, {
-        label: String(form.get("label")).trim(),
-        protocol: "eddystone",
-        eddystone_namespace: String(form.get("namespace")).trim(),
-        eddystone_instance: String(form.get("instance")).trim(),
+        label: texto("label"),
+        protocol: protocolo,
+        ...identificador,
         min_rssi: Number(form.get("min_rssi")),
       });
       formulario.reset();
@@ -133,12 +155,52 @@ export default function LocalPage() {
             <Field label="Onde fica" hint='Como quem trabalha no local chama: "Portão A"'>
               <Input name="label" required minLength={2} />
             </Field>
-            <Field label="Namespace" hint="10 bytes — pode colar como está na etiqueta">
-              <Input name="namespace" required placeholder="edd1ebeac04e5defa017" />
+
+            <Field
+              label="Protocolo"
+              hint="Use a tela de diagnóstico do app para descobrir qual o beacon transmite"
+            >
+              <Select
+                value={protocolo}
+                onChange={(e) => setProtocolo(e.target.value as BeaconProtocol)}
+              >
+                <option value="eddystone">Eddystone-UID</option>
+                <option value="ibeacon">iBeacon</option>
+              </Select>
             </Field>
-            <Field label="Instance" hint="6 bytes">
-              <Input name="instance" required placeholder="000000000001" />
-            </Field>
+
+            {protocolo === "eddystone" ? (
+              <>
+                <Field
+                  label="Namespace"
+                  hint="10 bytes — pode colar como está na etiqueta"
+                >
+                  <Input name="namespace" required placeholder="edd1ebeac04e5defa017" />
+                </Field>
+                <Field label="Instance" hint="6 bytes">
+                  <Input name="instance" required placeholder="000000000001" />
+                </Field>
+              </>
+            ) : (
+              <>
+                <Field label="UUID" hint="Com ou sem hífens, maiúsculas ou não">
+                  <Input
+                    name="uuid"
+                    required
+                    placeholder="f7826da6-4fa2-4e98-8024-bc5b71e0893e"
+                  />
+                </Field>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Major">
+                    <Input name="major" type="number" min={0} max={65535} required />
+                  </Field>
+                  <Field label="Minor">
+                    <Input name="minor" type="number" min={0} max={65535} required />
+                  </Field>
+                </div>
+              </>
+            )}
+
             <Field
               label="RSSI mínimo"
               hint="Meça no ponto mais distante que ainda conta e deixe 5 dBm de folga"
@@ -146,6 +208,15 @@ export default function LocalPage() {
               <Input name="min_rssi" type="number" min={-100} max={-30} defaultValue={-80} />
             </Field>
           </div>
+
+          {protocolo === "ibeacon" && (
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              iBeacon é lido no Android, mas não no iPhone — o iOS só entrega
+              esses anúncios via CoreLocation. Se houver iPhone na equipe, prefira
+              um beacon que também transmita Eddystone.
+            </p>
+          )}
+
           <div className="flex justify-end">
             <Button type="submit" variant="secondary" disabled={enviando}>
               Adicionar beacon

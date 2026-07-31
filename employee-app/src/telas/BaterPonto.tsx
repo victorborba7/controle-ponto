@@ -25,10 +25,12 @@ type Etapa =
 export function BaterPonto({
   perfil,
   aoAbrirHistorico,
+  aoAbrirDiagnostico,
   aoSair,
 }: {
   perfil: Perfil;
   aoAbrirHistorico: () => void;
+  aoAbrirDiagnostico: () => void;
   aoSair: () => void;
 }) {
   const cameraRef = useRef<CameraView>(null);
@@ -272,9 +274,15 @@ export function BaterPonto({
             />
           </View>
           <View style={{ flex: 1 }}>
-            <Botao titulo="Sair" variante="texto" onPress={aoSair} />
+            <Botao
+              titulo="Diagnóstico"
+              variante="secundario"
+              onPress={aoAbrirDiagnostico}
+            />
           </View>
         </View>
+
+        <Botao titulo="Sair" variante="texto" onPress={aoSair} />
       </View>
     </View>
   );

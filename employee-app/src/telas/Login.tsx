@@ -12,7 +12,13 @@ import * as Application from "expo-application";
 import { entrar, type Perfil } from "../services/api";
 import { Aviso, Botao, Legenda, Titulo, cores, estilosCampo } from "../ui";
 
-export function Login({ aoEntrar }: { aoEntrar: (perfil: Perfil) => void }) {
+export function Login({
+  aoEntrar,
+  aoAbrirDiagnostico,
+}: {
+  aoEntrar: (perfil: Perfil) => void;
+  aoAbrirDiagnostico: () => void;
+}) {
   const [empresa, setEmpresa] = useState("");
   const [matricula, setMatricula] = useState("");
   const [senha, setSenha] = useState("");
@@ -108,10 +114,14 @@ export function Login({ aoEntrar }: { aoEntrar: (perfil: Perfil) => void }) {
           />
         </View>
 
-        <View style={{ marginTop: 32 }}>
-          <Legenda>
-            Não sabe seu código de empresa ou senha? Procure o RH.
-          </Legenda>
+        <View style={{ marginTop: 32, gap: 16 }}>
+          <Legenda>Não sabe seu código de empresa ou senha? Procure o RH.</Legenda>
+
+          <Botao
+            titulo="Diagnóstico do local"
+            variante="texto"
+            onPress={aoAbrirDiagnostico}
+          />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

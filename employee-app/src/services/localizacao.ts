@@ -15,25 +15,32 @@ import NetInfo from "@react-native-community/netinfo";
 import * as Location from "expo-location";
 import { BleManager, State as BleState } from "react-native-ble-plx";
 
-import {
-  EDDYSTONE_SERVICE_UUID,
-  consolidar,
-  lerEddystone,
-  type LeituraEddystone,
-} from "./eddystone";
+import { consolidar, lerEddystone, type LeituraEddystone } from "./eddystone";
+import { consolidarIBeacons, lerIBeacon, type LeituraIBeacon } from "./ibeacon";
 
 /** Tempo de varredura BLE. Curto o bastante para não irritar, longo o bastante
  *  para o anúncio de um beacon (tipicamente a cada 100–1000 ms) aparecer. */
 const TIMEOUT_BLE_MS = 4000;
 const TIMEOUT_GPS_MS = 8000;
 
+/** Uma leitura de beacon no formato que o backend espera, seja qual for o protocolo. */
+export type BeaconRelatado =
+  | {
+      protocol: "eddystone";
+      eddystone_namespace: string;
+      eddystone_instance: string;
+      rssi: number;
+    }
+  | {
+      protocol: "ibeacon";
+      ibeacon_uuid: string;
+      ibeacon_major: number;
+      ibeacon_minor: number;
+      rssi: number;
+    };
+
 export type SinaisColetados = {
-  beacons: Array<{
-    protocol: "eddystone";
-    eddystone_namespace: string;
-    eddystone_instance: string;
-    rssi: number;
-  }>;
+  beacons: BeaconRelatado[];
   wifi: Array<{ ssid: string; bssid?: string }>;
   gps?: { latitude: number; longitude: number; accuracy_m: number };
   captured_at: string;
@@ -69,30 +76,43 @@ export function encerrarBle() {
 // Bluetooth
 // --------------------------------------------------------------------------
 
-async function coletarBeacons(avisos: string[]): Promise<LeituraEddystone[]> {
+type Varredura = {
+  eddystone: LeituraEddystone[];
+  ibeacon: LeituraIBeacon[];
+};
+
+async function coletarBeacons(avisos: string[]): Promise<Varredura> {
+  const vazio: Varredura = { eddystone: [], ibeacon: [] };
   const ble = obterBle();
 
   const estado = await ble.state();
   if (estado !== BleState.PoweredOn) {
     avisos.push("Bluetooth desligado — ligue para detectar os beacons do local.");
-    return [];
+    return vazio;
   }
 
   return new Promise((resolve) => {
-    const leituras: LeituraEddystone[] = [];
+    const eddystone: LeituraEddystone[] = [];
+    const ibeacon: LeituraIBeacon[] = [];
     let finalizado = false;
 
     const finalizar = () => {
       if (finalizado) return;
       finalizado = true;
       ble.stopDeviceScan();
-      resolve(consolidar(leituras));
+      resolve({
+        eddystone: consolidar(eddystone),
+        ibeacon: consolidarIBeacons(ibeacon),
+      });
     };
 
     const relogio = setTimeout(finalizar, TIMEOUT_BLE_MS);
 
     ble.startDeviceScan(
-      [EDDYSTONE_SERVICE_UUID],
+      // Sem filtro de serviço: o iBeacon não anuncia service UUID nenhum — ele
+      // vive no `manufacturerData`. Filtrar pelo UUID do Eddystone faria os
+      // iBeacons jamais aparecerem na varredura.
+      null,
       // Sem filtro de duplicatas: o RSSI oscila entre anúncios, e queremos a
       // melhor leitura de cada beacon, não a primeira.
       { allowDuplicates: true },
@@ -104,8 +124,16 @@ async function coletarBeacons(avisos: string[]): Promise<LeituraEddystone[]> {
           return;
         }
 
-        const leitura = lerEddystone(dispositivo?.serviceData, dispositivo?.rssi ?? null);
-        if (leitura) leituras.push(leitura);
+        const rssi = dispositivo?.rssi ?? null;
+
+        const eddy = lerEddystone(dispositivo?.serviceData, rssi);
+        if (eddy) {
+          eddystone.push(eddy);
+          return;
+        }
+
+        const ibec = lerIBeacon(dispositivo?.manufacturerData, rssi);
+        if (ibec) ibeacon.push(ibec);
       },
     );
   });
@@ -192,13 +220,24 @@ export async function coletarSinais(
   aoProgredir?.({ etapa: "gps", detalhe: "Obtendo a localização…" });
   const gps = await coletarGps(avisos);
 
-  const sinais: SinaisColetados = {
-    beacons: beacons.map((b) => ({
+  const relatados: BeaconRelatado[] = [
+    ...beacons.eddystone.map((b) => ({
       protocol: "eddystone" as const,
       eddystone_namespace: b.namespace,
       eddystone_instance: b.instance,
       rssi: b.rssi,
     })),
+    ...beacons.ibeacon.map((b) => ({
+      protocol: "ibeacon" as const,
+      ibeacon_uuid: b.uuid,
+      ibeacon_major: b.major,
+      ibeacon_minor: b.minor,
+      rssi: b.rssi,
+    })),
+  ].sort((a, b) => b.rssi - a.rssi);
+
+  const sinais: SinaisColetados = {
+    beacons: relatados,
     wifi,
     ...(gps ? { gps } : {}),
     captured_at: new Date().toISOString(),
@@ -209,7 +248,7 @@ export async function coletarSinais(
   return {
     sinais,
     descricao: descrever(sinais),
-    temSinalForte: beacons.length > 0 || wifi.length > 0,
+    temSinalForte: relatados.length > 0 || wifi.length > 0,
     avisos,
   };
 }
