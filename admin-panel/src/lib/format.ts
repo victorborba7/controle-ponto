@@ -86,6 +86,27 @@ export const corMetodo: Record<LocationMethod, string> = {
   none: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
 };
 
+/**
+ * Traduz o código do problema de qualidade numa orientação acionável.
+ *
+ * O backend devolve códigos (`blurry`, `face_too_small`) justamente para o
+ * painel poder dizer o que FAZER. "Qualidade insuficiente" não diz a ninguém
+ * se deve chegar mais perto, acender a luz ou firmar a mão.
+ */
+export const orientacaoQualidade: Record<string, string> = {
+  blurry: "foto desfocada — firme a câmera e evite mexer ao clicar",
+  face_too_small: "rosto pequeno demais — chegue mais perto da câmera",
+  face_too_far: "muito longe — o rosto precisa ocupar boa parte do quadro",
+  face_cropped: "rosto cortado — centralize no enquadramento",
+  low_detection_confidence:
+    "rosto pouco nítido para o sistema — melhore a iluminação e olhe para a câmera",
+};
+
+export function explicarRecusa(reason: string, issues: string[]): string {
+  if (!issues.length) return reason;
+  return issues.map((i) => orientacaoQualidade[i] ?? i).join("; ");
+}
+
 export const corStatus: Record<TimeEntryStatus, string> = {
   approved: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
   pending_review: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",

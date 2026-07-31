@@ -19,9 +19,18 @@ MIN_FACE_PIXELS = 80
 # cercado de fundo irrelevante.
 MIN_FACE_RATIO = 0.02
 
-# Variancia do laplaciano. Abaixo de ~60 a foto esta visivelmente tremida ou
-# desfocada; e a metrica classica de nitidez e barata de calcular.
-MIN_SHARPNESS = 60.0
+# Variancia do laplaciano, medida num recorte de tamanho canonico com o
+# histograma equalizado (ver `InsightFaceEngine._sharpness`).
+#
+# O valor vem de medicao, nao de palpite. Com a normalizacao, fotos utilizaveis
+# — incluindo webcam com reducao de ruido, pouca luz e resolucoes diferentes —
+# ficam acima de 176, enquanto rosto de fato fora de foco fica abaixo de 53.
+# 100 cai entre os dois com folga larga dos dois lados.
+#
+# **A normalizacao e o que torna este numero significativo.** Sem ela a metrica
+# media resolucao e contraste, nao foco: a MESMA foto ampliada 1,5x caia de 220
+# para 59 e era reprovada sem ter piorado em nada.
+MIN_SHARPNESS = 100.0
 
 MIN_DETECTION_SCORE = 0.60
 

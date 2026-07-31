@@ -19,7 +19,12 @@ import {
   Vazio,
 } from "@/components/ui";
 import { api } from "@/lib/api";
-import { formatarData, formatarDataHora, formatarPercentual } from "@/lib/format";
+import {
+  explicarRecusa,
+  formatarData,
+  formatarDataHora,
+  formatarPercentual,
+} from "@/lib/format";
 import type {
   EmployeeDetail,
   EnrollmentResult,
@@ -86,12 +91,12 @@ export default function FuncionarioPage() {
 
       if (resultado.rejected.length) {
         // Recusa parcial não é erro: o RH precisa saber quais fotos não
-        // serviram e por quê, para refazer só aquelas.
+        // serviram e, principalmente, o que fazer para corrigir.
         setAviso(
           `${resultado.created.length} foto(s) aceita(s). Recusadas: ` +
             resultado.rejected
-              .map((r) => `${r.filename} (${r.reason})`)
-              .join("; "),
+              .map((r) => `${r.filename} — ${explicarRecusa(r.reason, r.issues)}`)
+              .join(" · "),
         );
       }
 

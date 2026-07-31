@@ -40,6 +40,10 @@ EMBEDDING_DIM = 512
 # custo de CPU; abaixo disso o detector comeca a perder rosto de longe.
 DETECTION_SIZE = (640, 640)
 
+# Tamanho canonico para medir nitidez. 112 e o mesmo recorte que o ArcFace usa
+# internamente — a resolucao em que o detalhe do rosto de fato importa.
+SHARPNESS_CROP_SIZE = 112
+
 
 class InsightFaceEngine(FaceEngine):
     name = "insightface"
@@ -174,11 +178,22 @@ class InsightFaceEngine(FaceEngine):
         )
 
     def _sharpness(self, frame: "np.ndarray", box: BoundingBox) -> float:
-        """Variancia do laplaciano na regiao do rosto.
+        """Nitidez do rosto: variancia do laplaciano, normalizada.
 
-        Medida apenas no recorte do rosto, e nao na imagem toda: fundo com
-        textura (grade, parede de tijolo) inflaria a nitidez de uma selfie
-        tremida e deixaria passar foto ruim.
+        Duas normalizacoes, e as duas sao necessarias:
+
+        **Tamanho.** A variancia do laplaciano cai quando a mesma imagem e
+        ampliada — a borda se espalha por mais pixels. Sem redimensionar para
+        um tamanho canonico, a metrica mede resolucao e nao foco: medido aqui,
+        o MESMO rosto a 1,5x do tamanho passava de 220 para 59, cruzando o
+        limiar sem a foto ter piorado em nada.
+
+        **Contraste.** A variancia tambem cai com pouca luz, porque as bordas
+        ficam menos marcadas. Equalizar o histograma separa "sem foco" de
+        "mal iluminado" — a segunda e recuperavel, a primeira nao.
+
+        Medida so no recorte do rosto: fundo com textura (grade, parede de
+        tijolo) inflaria a nitidez de uma selfie tremida.
         """
         import cv2
 
@@ -190,4 +205,7 @@ class InsightFaceEngine(FaceEngine):
             return 0.0
 
         gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-        return float(cv2.Laplacian(gray, cv2.CV_64F).var())
+        canonico = cv2.resize(
+            gray, (SHARPNESS_CROP_SIZE, SHARPNESS_CROP_SIZE), interpolation=cv2.INTER_AREA
+        )
+        return float(cv2.Laplacian(cv2.equalizeHist(canonico), cv2.CV_64F).var())

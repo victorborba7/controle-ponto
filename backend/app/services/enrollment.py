@@ -275,7 +275,29 @@ async def load_active_templates(
     return list(result.scalars().all())
 
 
+# Traducao dos codigos de problema em orientacao acionavel. Dizer "qualidade
+# insuficiente" nao informa a ninguem se deve chegar mais perto, acender a luz
+# ou firmar a mao — e essa mensagem e a unica coisa que a pessoa ve quando o
+# cadastro inteiro e recusado.
+ORIENTACAO_POR_PROBLEMA = {
+    "blurry": "foto desfocada, firme a camera",
+    "face_too_small": "rosto pequeno demais, chegue mais perto",
+    "face_too_far": "muito longe, o rosto precisa ocupar boa parte do quadro",
+    "face_cropped": "rosto cortado, centralize no enquadramento",
+    "low_detection_confidence": "melhore a iluminacao e olhe para a camera",
+}
+
+
 def _summarize(rejected: list[RejectedImage]) -> str:
     if not rejected:
         return "nenhum"
-    return "; ".join(f"{item.filename}: {item.reason}" for item in rejected)
+
+    partes = []
+    for item in rejected:
+        detalhe = (
+            "; ".join(ORIENTACAO_POR_PROBLEMA.get(i, i) for i in item.issues)
+            if item.issues
+            else item.reason
+        )
+        partes.append(f"{item.filename} ({detalhe})")
+    return " · ".join(partes)
