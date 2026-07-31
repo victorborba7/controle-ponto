@@ -3,7 +3,7 @@
 > Documento de execução. O "o quê" e o "porquê" estão em [CLAUDE.MD](CLAUDE.MD).
 > Aqui está o **como** e em **que ordem**.
 
-**Status geral:** `Etapas 0 a 8 concluídas — Etapa 9 a seguir (app do funcionário)`
+**Status geral:** `Etapas 0 a 9 implementadas — Etapa 9 aguarda validação em Android físico`
 **Última atualização:** 2026-07-30
 
 ---
@@ -292,6 +292,24 @@ Postgres + API respondendo.
 
 **Critério de pronto:** APK instalado num Android físico batendo ponto contra o backend, detectando beacon Eddystone de verdade.
 
+> ⚠️ **Único critério de pronto do projeto que não pôde ser verificado aqui.**
+> Ele depende de um Android físico e de beacons Eddystone que ainda não foram
+> comprados — emulador não tem rádio Bluetooth. O código está completo e o que
+> era verificável foi verificado:
+>
+> - **Parser Eddystone-UID** exercitado contra quadros montados byte a byte no
+>   layout real (frame type, namespace, instance), incluindo as variações de
+>   grafia de UUID entre fabricantes de aparelho e o descarte de quadros URL,
+>   TLM e truncados.
+> - **Contrato com o backend** exercitado por HTTP com o payload exato que o
+>   app monta: aceito, método `beacon`, e a idempotência da fila offline
+>   confirmada (mesmo envio duas vezes → um registro, segunda marcada como
+>   duplicata).
+> - TypeScript limpo, `expo-doctor` 20/20.
+>
+> O roteiro de validação em campo está em
+> [docs/app-do-funcionario.md](docs/app-do-funcionario.md).
+
 > **Portão de decisão (D9):** com o Android validado, comprar a conta Apple
 > Developer e seguir para a 9b. Não comprar antes — e não deixar para a Etapa 12,
 > porque a aprovação leva dias (R4).
@@ -398,7 +416,7 @@ Postgres + API respondendo.
 | 6 — Validação de localização | 🟢 concluída | 2026-07-30 |
 | 7 — Bater ponto | 🟢 concluída | 2026-07-30 |
 | 8 — Painel admin | 🟢 concluída | 2026-07-30 |
-| 9 — App do funcionário (Android) | ⚪ não iniciada | |
+| 9 — App do funcionário (Android) | 🟡 código pronto, aguarda hardware | |
 | 9b — Paridade no iOS | ⚪ não iniciada | |
 | 10 — Liveness | ⚪ não iniciada | |
 | 11 — LGPD | ⚪ não iniciada | |

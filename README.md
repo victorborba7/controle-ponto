@@ -6,10 +6,11 @@ física (beacon BLE → Wi-Fi → GPS).
 - **Visão do produto e stack:** [CLAUDE.MD](CLAUDE.MD)
 - **Plano de execução por etapas:** [PLANO-DE-ACAO.md](PLANO-DE-ACAO.md)
 - **Instalação e cadastro dos beacons:** [docs/mapeamento-beacons.md](docs/mapeamento-beacons.md)
+- **Build e teste do app:** [docs/app-do-funcionario.md](docs/app-do-funcionario.md)
 
-**Estado atual:** backend do MVP funcional — cadastro de funcionários,
-enrollment facial, locais/beacons/Wi-Fi e o registro de ponto ponta a ponta.
-Painel do RH e app do funcionário são as próximas etapas.
+**Estado atual:** backend, painel do RH e app do funcionário implementados. O
+app aguarda validação num Android físico com beacons de verdade — é o único
+critério de pronto que depende de hardware ainda não adquirido.
 
 ## Estrutura
 

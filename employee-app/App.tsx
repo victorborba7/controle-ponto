@@ -1,0 +1,100 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { StatusBar } from "expo-status-bar";
+import { useCallback, useEffect, useState } from "react";
+import { SafeAreaView, View } from "react-native";
+
+import { encerrarSessao, lerPerfil, type Perfil } from "./src/services/api";
+import { encerrarBle } from "./src/services/localizacao";
+import { BaterPonto } from "./src/telas/BaterPonto";
+import { Consentimento, VERSAO_DO_TERMO } from "./src/telas/Consentimento";
+import { Historico } from "./src/telas/Historico";
+import { Login } from "./src/telas/Login";
+import { Legenda, cores } from "./src/ui";
+
+const CHAVE_CONSENTIMENTO = "ponto_consentimento_versao";
+
+type Tela = "carregando" | "consentimento" | "login" | "ponto" | "historico";
+
+/**
+ * Navegação por estado, sem biblioteca de rotas.
+ *
+ * São quatro telas com transições lineares; um roteador aqui traria
+ * configuração e peso sem resolver problema nenhum. Se o app crescer para abas
+ * ou histórico de navegação, aí vale a troca.
+ */
+export default function App() {
+  const [tela, setTela] = useState<Tela>("carregando");
+  const [perfil, setPerfil] = useState<Perfil | null>(null);
+
+  const decidirTelaInicial = useCallback(async () => {
+    const consentido = await AsyncStorage.getItem(CHAVE_CONSENTIMENTO);
+
+    // Termo novo exige aceite novo: sem isso não daria para provar *o que* a
+    // pessoa concordou.
+    if (consentido !== VERSAO_DO_TERMO) {
+      setTela("consentimento");
+      return;
+    }
+
+    const salvo = await lerPerfil();
+    if (salvo) {
+      setPerfil(salvo);
+      setTela("ponto");
+    } else {
+      setTela("login");
+    }
+  }, []);
+
+  useEffect(() => {
+    void decidirTelaInicial();
+  }, [decidirTelaInicial]);
+
+  // O rádio BLE não pode ficar ligado depois que o app fecha.
+  useEffect(() => encerrarBle, []);
+
+  async function aceitarTermo() {
+    await AsyncStorage.setItem(CHAVE_CONSENTIMENTO, VERSAO_DO_TERMO);
+    const salvo = await lerPerfil();
+    setPerfil(salvo);
+    setTela(salvo ? "ponto" : "login");
+  }
+
+  async function sair() {
+    await encerrarSessao();
+    setPerfil(null);
+    setTela("login");
+  }
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: cores.fundo }}>
+      <StatusBar style="light" />
+
+      {tela === "carregando" && (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <Legenda>Carregando…</Legenda>
+        </View>
+      )}
+
+      {tela === "consentimento" && <Consentimento aoAceitar={aceitarTermo} />}
+
+      {tela === "login" && (
+        <Login
+          aoEntrar={(novo) => {
+            setPerfil(novo);
+            setTela("ponto");
+          }}
+        />
+      )}
+
+      {tela === "ponto" && perfil && (
+        <BaterPonto
+          perfil={perfil}
+          aoAbrirHistorico={() => setTela("historico")}
+          aoSair={sair}
+        />
+      )}
+
+      {tela === "historico" && <Historico aoVoltar={() => setTela("ponto")} />}
+    </SafeAreaView>
+  );
+}
