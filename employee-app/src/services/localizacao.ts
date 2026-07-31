@@ -13,7 +13,7 @@
 
 import NetInfo from "@react-native-community/netinfo";
 import * as Location from "expo-location";
-import { BleManager, State as BleState } from "react-native-ble-plx";
+import { BleManager, State as BleState, ScanMode } from "react-native-ble-plx";
 
 import { macsConhecidos, sincronizarConfig } from "./configLocal";
 import { consolidar, lerEddystone, type LeituraEddystone } from "./eddystone";
@@ -158,9 +158,27 @@ async function coletarBeacons(
       // vive no `manufacturerData`. Filtrar pelo UUID do Eddystone faria os
       // iBeacons jamais aparecerem na varredura.
       null,
-      // Sem filtro de duplicatas: o RSSI oscila entre anúncios, e queremos a
-      // melhor leitura de cada beacon, não a primeira.
-      { allowDuplicates: true },
+      {
+        // Sem filtro de duplicatas: o RSSI oscila entre anúncios, e queremos a
+        // melhor leitura de cada beacon, não a primeira.
+        allowDuplicates: true,
+
+        // **Varredura contínua, e isto não é otimização — é o que faz o beacon
+        // aparecer.** O padrão do Android é `LowPower`: liga o rádio 500 ms a
+        // cada 5 s, ou seja, 10% do tempo. Numa varredura de 4 s isso dá uma
+        // única janela, e um beacon que anuncia a cada ~500 ms passa batido
+        // com facilidade — enquanto aparelhos que anunciam muito rápido são
+        // pegos assim mesmo. O sintoma é cruel: a lista enche de dispositivos
+        // e justamente o beacon procurado falta.
+        //
+        // O custo de bateria é irrelevante aqui: são 4 segundos, disparados
+        // por um toque do funcionário, não uma varredura de fundo.
+        scanMode: ScanMode.LowLatency,
+
+        // O Aruba (e a maioria dos beacons) usa advertising legado, não
+        // estendido. Explícito para não depender do padrão da biblioteca.
+        legacyScan: true,
+      },
       (erro, dispositivo) => {
         if (erro) {
           // A mensagem do ble-plx e o que distingue "permissao negada" de
