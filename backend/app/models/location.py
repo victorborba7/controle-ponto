@@ -91,6 +91,13 @@ class Beacon(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
             unique=True,
             postgresql_where=text("protocol = 'ibeacon'"),
         ),
+        Index(
+            "uq_beacons_mac",
+            "tenant_id",
+            "mac_address",
+            unique=True,
+            postgresql_where=text("protocol = 'mac'"),
+        ),
     )
 
     site_id: Mapped[uuid.UUID] = mapped_column(
@@ -115,6 +122,9 @@ class Beacon(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
     eddystone_namespace: Mapped[str | None] = mapped_column(String(20), nullable=True)
     eddystone_instance: Mapped[str | None] = mapped_column(String(12), nullable=True)
 
+    # --- MAC ---
+    # Preenchido sempre que conhecido (ajuda a identificar o hardware no
+    # inventario), mas so e usado para *casar* o beacon quando protocol = MAC.
     mac_address: Mapped[str | None] = mapped_column(String(17), nullable=True)
 
     # Limiar de proximidade. RSSI e negativo e quanto mais perto, maior (menos

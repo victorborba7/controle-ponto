@@ -3,25 +3,57 @@
 Roteiro para validar o beacon com o app. Escrito a partir do caso concreto de
 um **Aruba ARBT0100**, mas os passos valem para qualquer beacon.
 
-> **O app lê os dois formatos.** Eddystone-UID e iBeacon. Se o seu beacon
-> transmitir qualquer um dos dois, funciona — não é preciso reconfigurá-lo para
-> um formato específico.
+> **O app identifica o beacon de três formas:** Eddystone-UID, iBeacon ou o
+> endereço MAC. Se o seu beacon transmitir qualquer coisa reconhecível — ou
+> simplesmente transmitir —, funciona no Android.
 
 ---
 
-## Sobre o Aruba ARBT0100 especificamente
+## O caso do Aruba ARBT0100 (verificado)
 
-Duas coisas a saber antes de começar:
+Leitura real de uma unidade, pelo nRF Connect:
 
-**1. Beacons Aruba nascem no ecossistema Meridian.** São configurados pelo app
-"Aruba Beacons", que normalmente pede login em uma conta Meridian (a plataforma
-de localização da HPE). Se você não tem essa conta, pode não conseguir *alterar*
-a configuração de fábrica — mas isso não impede o teste, porque o beacon já vem
-transmitindo alguma coisa.
+```
+Beacon Aruba (iBeacon)          7C:EC:79:44:C5:B5      -56 dBm
+Company: Apple, Inc. <0x004C>   Type: Beacon <0x02>    Length: 21 bytes
+UUID:  4152554e-f99b-4a3b-86d0-947070693a78
+Major: 0     Minor: 0
+```
 
-**2. Não sei de cor o que este modelo transmite de fábrica.** Beacons Aruba
-costumam sair em iBeacon, e alguns firmwares fazem Eddystone em paralelo. Em vez
-de adivinhar, a Fase 1 abaixo descobre em 2 minutos — e o app lê os dois casos.
+Três conclusões:
+
+**1. É um iBeacon padrão.** Company `0x004C`, type `0x02`, 21 bytes — exatamente
+o layout que o app lê. Funciona sem reconfigurar nada.
+
+**2. O identificador é de fábrica, e isso é um problema.** Os quatro primeiros
+bytes do UUID, `41 52 55 4e`, são ASCII de **"ARUN"** (Aruba Networks) — é o
+UUID padrão da linha. Com **Major 0 e Minor 0**, provavelmente **todas as
+unidades saem idênticas**.
+
+Isso significa que, por UUID/Major/Minor, você não conseguiria distinguir o
+beacon do "Portão A" do que está no "Almoxarifado" — e o cadastro do segundo
+seria recusado por duplicidade.
+
+**3. Por isso o MAC é a escolha certa aqui.** `7C:EC:79:44:C5:B5` é único por
+aparelho. É a razão de existir o terceiro modo de identificação.
+
+### Duas saídas, e qual escolher
+
+| Caminho | Vantagem | Custo |
+|---|---|---|
+| **Cadastrar pelo MAC** | Funciona hoje, sem tocar no beacon | **Não funciona no iPhone** — o iOS não expõe MAC de periférico |
+| **Configurar Major/Minor distintos** pelo app Aruba Beacons | iBeacon volta a ser único, e o iPhone fica viável depois | Exige conta Meridian |
+
+Se conseguir acesso ao app da Aruba, **prefira configurar Major/Minor** — sai
+mais barato que refazer isso quando o iPhone entrar. Se não conseguir, o MAC
+resolve o Android agora.
+
+### Antes de comprar o resto dos beacons
+
+Confirme que **o MAC não rotaciona**: leia agora, aguarde 30 minutos e leia de
+novo. Alguns beacons giram o endereço por privacidade — se este girar,
+identificação por MAC não se sustenta e a configuração via Aruba Beacons passa
+a ser obrigatória.
 
 ---
 
@@ -45,7 +77,11 @@ O que procurar:
 |---|---|
 | `Apple` + tipo `iBeacon`, com UUID/Major/Minor | **iBeacon** — anote os três valores |
 | Service `0xFEAA` ou `Eddystone` | **Eddystone** — anote namespace e instance |
-| Só `Aruba` ou dados brutos, sem nenhum dos dois | Precisa configurar pelo app da Aruba |
+| Nada reconhecível, ou identificadores repetidos entre beacons | Use o **MAC** (a linha `XX:XX:XX:XX:XX:XX` no topo) |
+
+**Anote o MAC de qualquer forma.** Ele aparece logo abaixo do nome do
+dispositivo e é a saída quando o identificador anunciado não distingue uma
+unidade da outra.
 
 ### Opção B — Tela de diagnóstico do próprio app (mais confiável)
 
@@ -56,22 +92,31 @@ Isso importa: um scanner genérico prova que o beacon transmite, mas não prova
 que *este app* consegue lê-lo. Se o identificador aparecer no diagnóstico, ele
 aparecerá na batida.
 
-A tela mostra:
+A tela tem duas partes.
+
+**Beacons reconhecidos** — o que o app conseguiu interpretar:
 
 ```
-EDDYSTONE-UID                          -58 dBm
-edd1ebeac04e5defa017 / 000000000001
-Toque para copiar  ·  sugestão de limiar: -63 dBm
+IBEACON                                -56 dBm
+4152554e-f99b-4a3b-86d0-947070693a78
+major 0 · minor 0
+Toque para copiar  ·  sugestão de limiar: -61 dBm
 ```
 
-ou
+**Todos os dispositivos vistos** — tudo que o rádio enxergou, com MAC:
 
 ```
-IBEACON                                -58 dBm
-f7826da6-4fa2-4e98-8024-bc5b71e0893e
-major 1 · minor 42
-Toque para copiar  ·  sugestão de limiar: -63 dBm
+7C:EC:79:44:C5:B5                      -56 dBm
+Beacon Aruba · IBEACON
+Toque para copiar o MAC  ·  sugestão de limiar: -61 dBm
 ```
+
+É esta segunda lista que resolve o caso do Aruba: identifique a unidade pelo
+nome ou pelo sinal mais forte (encoste o celular nela) e copie o MAC.
+
+> Esta lista inclui aparelhos de passantes e **fica só no celular** — nada dela
+> é enviado ao servidor. Na batida, o app relata apenas os MACs que já estão
+> cadastrados, justamente para não coletar identificadores de terceiros.
 
 Requer o APK (Fase 3), então na primeira vez use a Opção A.
 
@@ -96,11 +141,15 @@ Entre com `empresa-demo` / `rh@empresademo.com.br` / `senha123`.
 1. **Locais** → *Cadastrar local* → nome, coordenadas do hangar, raio 200 m
 2. Abra o local → **Beacons** → escolha o protocolo no seletor e preencha:
 
-| Se for Eddystone | Se for iBeacon |
-|---|---|
-| Namespace (20 dígitos hex) | UUID |
-| Instance (12 dígitos hex) | Major e Minor |
-| RSSI mínimo: o medido **−5 dBm** | idem |
+| Eddystone | iBeacon | MAC |
+|---|---|---|
+| Namespace (20 hex) | UUID | Endereço MAC |
+| Instance (12 hex) | Major e Minor | — |
+
+Em todos: **RSSI mínimo = o medido − 5 dBm**.
+
+Para o Aruba do exemplo, seria: protocolo **Endereço MAC**,
+`7C:EC:79:44:C5:B5`, RSSI mínimo `-61` (medido −56, menos a folga).
 
 Pode colar exatamente como o scanner mostrou — com hífens, maiúsculas, dois
 pontos. O sistema normaliza; foi feito justamente para isso.
@@ -199,19 +248,27 @@ pelo app **Aruba Beacons** — e aí a conta Meridian entra na conta.
 
 ---
 
-## Nota sobre iBeacon e o iPhone
+## O que cada modo custa no iPhone (Etapa 9b)
 
-O app lê iBeacon **no Android**. No iOS, não: o sistema filtra esses anúncios do
-CoreBluetooth e só os entrega via CoreLocation, com o UUID conhecido de antemão
-— foi exatamente esse limite que motivou a decisão D8 do plano, de preferir
+| Modo | Android | iPhone |
+|---|---|---|
+| **Eddystone-UID** | ✅ | ✅ |
+| **iBeacon** | ✅ | ⚠️ só via CoreLocation, com UUID fixo no app |
+| **MAC** | ✅ | ❌ **impossível** — o iOS não expõe MAC de periférico |
+
+Foi exatamente esse quadro que motivou a decisão D8 do plano, de preferir
 Eddystone.
 
-Consequência prática: **se o Aruba só fizer iBeacon, ele funciona no Android
-hoje, mas a Etapa 9b (iPhone) exigirá** uma destas saídas:
+Consequência para o Aruba: ele funciona no Android hoje pelo MAC, mas a Etapa 9b
+exigirá uma destas saídas:
 
-- configurar o beacon para transmitir Eddystone também (muitos fazem os dois em
-  paralelo), ou
-- somar uma biblioteca CoreLocation ao app para o caminho iOS
+1. **Configurar Major/Minor distintos** pelo app Aruba Beacons e cadastrar por
+   iBeacon, somando uma biblioteca CoreLocation ao app iOS — funciona, mas o
+   UUID precisa ser fixo e conhecido em tempo de build
+2. **Configurar o beacon para Eddystone**, se o firmware permitir — a saída mais
+   limpa
+3. **Trocar por beacons que transmitam Eddystone** no hangar definitivo
 
-Nada disso bloqueia a validação agora. Só vale saber antes de comprar o resto
-dos beacons para o hangar.
+Nada disso bloqueia a validação agora. Mas vale resolver **antes de comprar o
+resto dos beacons**, porque a escolha do hardware é o que fica difícil de
+desfazer.

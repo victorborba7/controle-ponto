@@ -77,11 +77,13 @@ export default function LocalPage() {
             eddystone_namespace: texto("namespace"),
             eddystone_instance: texto("instance"),
           }
-        : {
-            ibeacon_uuid: texto("uuid"),
-            ibeacon_major: Number(form.get("major")),
-            ibeacon_minor: Number(form.get("minor")),
-          };
+        : protocolo === "ibeacon"
+          ? {
+              ibeacon_uuid: texto("uuid"),
+              ibeacon_major: Number(form.get("major")),
+              ibeacon_minor: Number(form.get("minor")),
+            }
+          : { mac_address: texto("mac") };
 
     try {
       await api.post(`/sites/${id}/beacons`, {
@@ -166,10 +168,11 @@ export default function LocalPage() {
               >
                 <option value="eddystone">Eddystone-UID</option>
                 <option value="ibeacon">iBeacon</option>
+                <option value="mac">Endereço MAC</option>
               </Select>
             </Field>
 
-            {protocolo === "eddystone" ? (
+            {protocolo === "eddystone" && (
               <>
                 <Field
                   label="Namespace"
@@ -181,7 +184,9 @@ export default function LocalPage() {
                   <Input name="instance" required placeholder="000000000001" />
                 </Field>
               </>
-            ) : (
+            )}
+
+            {protocolo === "ibeacon" && (
               <>
                 <Field label="UUID" hint="Com ou sem hífens, maiúsculas ou não">
                   <Input
@@ -201,6 +206,15 @@ export default function LocalPage() {
               </>
             )}
 
+            {protocolo === "mac" && (
+              <Field
+                label="Endereço MAC"
+                hint="Aparece na tela de diagnóstico do app. Único por aparelho."
+              >
+                <Input name="mac" required placeholder="7c:ec:79:44:c5:b5" />
+              </Field>
+            )}
+
             <Field
               label="RSSI mínimo"
               hint="Meça no ponto mais distante que ainda conta e deixe 5 dBm de folga"
@@ -214,6 +228,17 @@ export default function LocalPage() {
               iBeacon é lido no Android, mas não no iPhone — o iOS só entrega
               esses anúncios via CoreLocation. Se houver iPhone na equipe, prefira
               um beacon que também transmita Eddystone.
+            </p>
+          )}
+
+          {protocolo === "mac" && (
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              O MAC é o identificador mais confiável quando vários beacons saem
+              de fábrica com o mesmo UUID/Major/Minor — ele é único por aparelho.
+              Em compensação, <strong>não funciona no iPhone</strong>: o iOS não
+              expõe o MAC de periféricos por API nenhuma. Confirme também que o
+              beacon não rotaciona o endereço (leia o MAC, aguarde 30 min e leia
+              de novo).
             </p>
           )}
 

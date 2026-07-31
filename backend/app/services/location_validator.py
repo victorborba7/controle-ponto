@@ -214,14 +214,21 @@ def _check_beacons(
 
 
 def _beacon_identity(beacon: Beacon) -> tuple:
+    """Chave de comparacao, espelhando `BeaconReading.identity`.
+
+    As duas precisam produzir a mesma tupla para o mesmo hardware — se
+    divergirem, o beacon simplesmente nunca casa, sem erro nenhum.
+    """
     if beacon.protocol is BeaconProtocol.EDDYSTONE:
         return (beacon.protocol, beacon.eddystone_namespace, beacon.eddystone_instance)
-    return (
-        beacon.protocol,
-        beacon.ibeacon_uuid,
-        beacon.ibeacon_major,
-        beacon.ibeacon_minor,
-    )
+    if beacon.protocol is BeaconProtocol.IBEACON:
+        return (
+            beacon.protocol,
+            beacon.ibeacon_uuid,
+            beacon.ibeacon_major,
+            beacon.ibeacon_minor,
+        )
+    return (beacon.protocol, beacon.mac_address)
 
 
 def _beacon_confidence(rssi: int, min_rssi: int) -> float:
@@ -455,6 +462,7 @@ def build_audit_payload(
                     "ibeacon_uuid": leitura.ibeacon_uuid,
                     "ibeacon_major": leitura.ibeacon_major,
                     "ibeacon_minor": leitura.ibeacon_minor,
+                    "mac_address": leitura.mac_address,
                     "rssi": leitura.rssi,
                 }
                 for leitura in evidence.beacons

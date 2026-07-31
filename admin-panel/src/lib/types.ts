@@ -11,7 +11,7 @@ export type EmployeeStatus = "active" | "inactive" | "suspended";
 export type EntryType = "in" | "out" | "break_start" | "break_end";
 export type LocationMethod = "beacon" | "wifi" | "gps" | "none";
 export type TimeEntryStatus = "approved" | "pending_review" | "rejected";
-export type BeaconProtocol = "eddystone" | "ibeacon";
+export type BeaconProtocol = "eddystone" | "ibeacon" | "mac";
 
 export type AdminProfile = {
   id: string;

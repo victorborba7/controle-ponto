@@ -15,6 +15,7 @@ import NetInfo from "@react-native-community/netinfo";
 import * as Location from "expo-location";
 import { BleManager, State as BleState } from "react-native-ble-plx";
 
+import { macsConhecidos, sincronizarConfig } from "./configLocal";
 import { consolidar, lerEddystone, type LeituraEddystone } from "./eddystone";
 import { consolidarIBeacons, lerIBeacon, type LeituraIBeacon } from "./ibeacon";
 
@@ -37,7 +38,20 @@ export type BeaconRelatado =
       ibeacon_major: number;
       ibeacon_minor: number;
       rssi: number;
+    }
+  | {
+      protocol: "mac";
+      mac_address: string;
+      rssi: number;
     };
+
+/** Dispositivo BLE cru, como a tela de diagnóstico o exibe. */
+export type DispositivoVisto = {
+  mac: string;
+  nome: string | null;
+  rssi: number;
+  reconhecido: "eddystone" | "ibeacon" | null;
+};
 
 export type SinaisColetados = {
   beacons: BeaconRelatado[];
@@ -57,6 +71,8 @@ export type ResumoColeta = {
   descricao: string;
   temSinalForte: boolean;
   avisos: string[];
+  /** Tudo que o rádio enxergou. Só a tela de diagnóstico usa — nunca é enviado. */
+  vistos: DispositivoVisto[];
 };
 
 let gerenciadorBle: BleManager | null = null;
@@ -79,10 +95,24 @@ export function encerrarBle() {
 type Varredura = {
   eddystone: LeituraEddystone[];
   ibeacon: LeituraIBeacon[];
+  /** MACs relatáveis: só os que estão cadastrados (ver `macsPermitidos`). */
+  macs: Array<{ mac: string; rssi: number }>;
+  /** Tudo que apareceu, para a tela de diagnóstico. **Nunca é enviado.** */
+  vistos: DispositivoVisto[];
 };
 
-async function coletarBeacons(avisos: string[]): Promise<Varredura> {
-  const vazio: Varredura = { eddystone: [], ibeacon: [] };
+/**
+ * Varre o Bluetooth.
+ *
+ * `macsPermitidos` é o filtro de privacidade: a varredura precisa ser aberta
+ * para enxergar iBeacons e MACs, e aberta ela vê celulares e relógios de quem
+ * passa. Só os MACs cadastrados entram no que será relatado ao servidor.
+ */
+async function coletarBeacons(
+  avisos: string[],
+  macsPermitidos: Set<string>,
+): Promise<Varredura> {
+  const vazio: Varredura = { eddystone: [], ibeacon: [], macs: [], vistos: [] };
   const ble = obterBle();
 
   const estado = await ble.state();
@@ -94,6 +124,8 @@ async function coletarBeacons(avisos: string[]): Promise<Varredura> {
   return new Promise((resolve) => {
     const eddystone: LeituraEddystone[] = [];
     const ibeacon: LeituraIBeacon[] = [];
+    const porMac = new Map<string, { mac: string; rssi: number }>();
+    const vistos = new Map<string, DispositivoVisto>();
     let finalizado = false;
 
     const finalizar = () => {
@@ -103,6 +135,8 @@ async function coletarBeacons(avisos: string[]): Promise<Varredura> {
       resolve({
         eddystone: consolidar(eddystone),
         ibeacon: consolidarIBeacons(ibeacon),
+        macs: Array.from(porMac.values()).sort((a, b) => b.rssi - a.rssi),
+        vistos: Array.from(vistos.values()).sort((a, b) => b.rssi - a.rssi),
       });
     };
 
@@ -125,15 +159,34 @@ async function coletarBeacons(avisos: string[]): Promise<Varredura> {
         }
 
         const rssi = dispositivo?.rssi ?? null;
+        if (rssi === null) return;
+
+        // No Android, `device.id` é o MAC. No iOS é um UUID por app — por isso
+        // identificação por MAC não funciona lá.
+        const mac = (dispositivo?.id ?? "").toLowerCase();
 
         const eddy = lerEddystone(dispositivo?.serviceData, rssi);
-        if (eddy) {
-          eddystone.push(eddy);
-          return;
-        }
+        const ibec = eddy ? null : lerIBeacon(dispositivo?.manufacturerData, rssi);
 
-        const ibec = lerIBeacon(dispositivo?.manufacturerData, rssi);
+        if (eddy) eddystone.push(eddy);
         if (ibec) ibeacon.push(ibec);
+
+        if (mac) {
+          if (macsPermitidos.has(mac)) {
+            const atual = porMac.get(mac);
+            if (!atual || rssi > atual.rssi) porMac.set(mac, { mac, rssi });
+          }
+
+          const antes = vistos.get(mac);
+          if (!antes || rssi > antes.rssi) {
+            vistos.set(mac, {
+              mac,
+              nome: dispositivo?.localName ?? dispositivo?.name ?? null,
+              rssi,
+              reconhecido: eddy ? "eddystone" : ibec ? "ibeacon" : null,
+            });
+          }
+        }
       },
     );
   });
@@ -208,8 +261,12 @@ export async function coletarSinais(
 ): Promise<ResumoColeta> {
   const avisos: string[] = [];
 
+  // A configuração vem do cache quando não há rede — que é exatamente o caso
+  // em que ela mais importa.
+  const locais = await sincronizarConfig();
+
   aoProgredir?.({ etapa: "bluetooth", detalhe: "Procurando beacons do local…" });
-  const beacons = await coletarBeacons(avisos);
+  const beacons = await coletarBeacons(avisos, macsConhecidos(locais));
 
   aoProgredir?.({ etapa: "wifi", detalhe: "Verificando a rede Wi-Fi…" });
   const wifi = await coletarWifi(avisos);
@@ -234,6 +291,11 @@ export async function coletarSinais(
       ibeacon_minor: b.minor,
       rssi: b.rssi,
     })),
+    ...beacons.macs.map((b) => ({
+      protocol: "mac" as const,
+      mac_address: b.mac,
+      rssi: b.rssi,
+    })),
   ].sort((a, b) => b.rssi - a.rssi);
 
   const sinais: SinaisColetados = {
@@ -250,6 +312,7 @@ export async function coletarSinais(
     descricao: descrever(sinais),
     temSinalForte: relatados.length > 0 || wifi.length > 0,
     avisos,
+    vistos: beacons.vistos,
   };
 }
 

@@ -77,6 +77,25 @@ def make_beacon(
     )
 
 
+def make_beacon_mac(
+    site: Site,
+    *,
+    label: str = "Aruba - Portao A",
+    mac: str = "7c:ec:79:44:c5:b5",
+    min_rssi: int = -75,
+) -> Beacon:
+    return Beacon(
+        id=uuid.uuid4(),
+        tenant_id=TENANT,
+        site_id=site.id,
+        label=label,
+        protocol=BeaconProtocol.MAC,
+        mac_address=mac,
+        min_rssi=min_rssi,
+        is_active=True,
+    )
+
+
 def make_wifi(
     site: Site,
     *,
@@ -345,6 +364,149 @@ def test_beacon_desativado_deixa_de_valer():
     veredito = validate_location(LocationEvidence(beacons=[beacon_reading(rssi=-40)]), reg)
 
     assert veredito.method is LocationMethod.NONE
+
+
+# --------------------------------------------------------------------------
+# Beacon identificado por MAC
+# --------------------------------------------------------------------------
+
+
+def test_beacon_por_mac_confirma_presenca():
+    """Ultimo recurso, para hardware cujo anuncio nao sabemos interpretar.
+
+    Tambem resolve o caso de varios beacons sairem de fabrica com o mesmo
+    UUID/major/minor: o MAC e unico por aparelho.
+    """
+    site = make_site()
+    reg = registry([site], [make_beacon_mac(site)])
+
+    veredito = validate_location(
+        LocationEvidence(
+            beacons=[
+                BeaconReading(
+                    protocol=BeaconProtocol.MAC,
+                    mac_address="7C:EC:79:44:C5:B5",
+                    rssi=-56,
+                )
+            ]
+        ),
+        reg,
+    )
+
+    assert veredito.method is LocationMethod.BEACON
+    assert veredito.accepted
+    assert veredito.beacon_rssi == -56
+
+
+def test_mac_com_grafia_diferente_ainda_casa():
+    """A normalizacao vale igual para MAC: o scanner mostra em maiusculas."""
+    site = make_site()
+    reg = registry([site], [make_beacon_mac(site, mac="7c:ec:79:44:c5:b5")])
+
+    for grafia in ("7C:EC:79:44:C5:B5", "7c-ec-79-44-c5-b5", "7CEC7944C5B5"):
+        veredito = validate_location(
+            LocationEvidence(
+                beacons=[
+                    BeaconReading(
+                        protocol=BeaconProtocol.MAC, mac_address=grafia, rssi=-56
+                    )
+                ]
+            ),
+            reg,
+        )
+        assert veredito.accepted, grafia
+
+
+def test_mac_desconhecido_e_ignorado():
+    site = make_site()
+    reg = registry([site], [make_beacon_mac(site, mac="7c:ec:79:44:c5:b5")])
+
+    veredito = validate_location(
+        LocationEvidence(
+            beacons=[
+                BeaconReading(
+                    protocol=BeaconProtocol.MAC, mac_address="aa:bb:cc:dd:ee:ff", rssi=-40
+                )
+            ]
+        ),
+        reg,
+    )
+
+    assert veredito.method is LocationMethod.NONE
+
+
+def test_mac_abaixo_do_limiar_nao_confirma():
+    site = make_site()
+    reg = registry([site], [make_beacon_mac(site, min_rssi=-70)])
+
+    veredito = validate_location(
+        LocationEvidence(
+            beacons=[
+                BeaconReading(
+                    protocol=BeaconProtocol.MAC,
+                    mac_address="7c:ec:79:44:c5:b5",
+                    rssi=-85,
+                )
+            ]
+        ),
+        reg,
+    )
+
+    assert veredito.method is LocationMethod.NONE
+
+
+def test_protocolos_diferentes_nao_se_confundem():
+    """Um beacon cadastrado por MAC nao casa com uma leitura de iBeacon.
+
+    A identidade inclui o protocolo, entao os espacos de identificador ficam
+    separados — o que evita um casamento acidental entre formatos.
+    """
+    site = make_site()
+    reg = registry([site], [make_beacon_mac(site, mac="7c:ec:79:44:c5:b5")])
+
+    veredito = validate_location(
+        LocationEvidence(
+            beacons=[
+                BeaconReading(
+                    protocol=BeaconProtocol.IBEACON,
+                    ibeacon_uuid="4152554e-f99b-4a3b-86d0-947070693a78",
+                    ibeacon_major=0,
+                    ibeacon_minor=0,
+                    rssi=-50,
+                )
+            ]
+        ),
+        reg,
+    )
+
+    assert veredito.method is LocationMethod.NONE
+
+
+def test_varios_beacons_de_protocolos_diferentes_no_mesmo_local():
+    """Migracao gradual: o local pode ter beacons antigos e novos ao mesmo tempo."""
+    site = make_site()
+    reg = registry(
+        [site],
+        [make_beacon(site, label="Eddystone"), make_beacon_mac(site, label="Aruba")],
+    )
+
+    veredito = validate_location(
+        LocationEvidence(
+            beacons=[
+                beacon_reading(rssi=-80),
+                BeaconReading(
+                    protocol=BeaconProtocol.MAC,
+                    mac_address="7c:ec:79:44:c5:b5",
+                    rssi=-55,
+                ),
+            ]
+        ),
+        reg,
+    )
+
+    # Vence o sinal mais forte, independentemente do protocolo.
+    assert veredito.accepted
+    assert veredito.beacon_rssi == -55
 
 
 # --------------------------------------------------------------------------

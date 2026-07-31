@@ -2,7 +2,12 @@ import * as Clipboard from "expo-clipboard";
 import { useCallback, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
-import { coletarSinais, type SinaisColetados } from "../services/localizacao";
+import {
+  coletarSinais,
+  type BeaconRelatado,
+  type DispositivoVisto,
+  type SinaisColetados,
+} from "../services/localizacao";
 import { Aviso, Botao, Cartao, Legenda, Titulo, cores } from "../ui";
 
 /**
@@ -19,17 +24,20 @@ import { Aviso, Botao, Cartao, Legenda, Titulo, cores } from "../ui";
  */
 export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
   const [sinais, setSinais] = useState<SinaisColetados | null>(null);
+  const [vistos, setVistos] = useState<DispositivoVisto[]>([]);
   const [avisos, setAvisos] = useState<string[]>([]);
   const [etapa, setEtapa] = useState<string | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
 
   const varrer = useCallback(async () => {
     setSinais(null);
+    setVistos([]);
     setCopiado(null);
     setEtapa("Procurando…");
     try {
       const resumo = await coletarSinais((p) => setEtapa(p.detalhe || null));
       setSinais(resumo.sinais);
+      setVistos(resumo.vistos);
       setAvisos(resumo.avisos);
     } catch {
       setAvisos(["Falha ao varrer os sinais."]);
@@ -77,15 +85,7 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
                 </Aviso>
               ) : (
                 sinais.beacons.map((beacon, indice) => {
-                  const identificador =
-                    beacon.protocol === "eddystone"
-                      ? `${beacon.eddystone_namespace} / ${beacon.eddystone_instance}`
-                      : `${beacon.ibeacon_uuid}\nmajor ${beacon.ibeacon_major} · minor ${beacon.ibeacon_minor}`;
-
-                  const paraCopiar =
-                    beacon.protocol === "eddystone"
-                      ? `${beacon.eddystone_namespace}\n${beacon.eddystone_instance}`
-                      : `${beacon.ibeacon_uuid}\n${beacon.ibeacon_major}\n${beacon.ibeacon_minor}`;
+                  const { identificador, paraCopiar } = descreverBeacon(beacon);
 
                   return (
                     <Pressable
@@ -102,17 +102,12 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
                         >
                           <Text
                             style={{
-                              color:
-                                beacon.protocol === "eddystone"
-                                  ? cores.acento
-                                  : cores.info,
+                              color: corDoProtocolo[beacon.protocol],
                               fontWeight: "700",
                               fontSize: 13,
                             }}
                           >
-                            {beacon.protocol === "eddystone"
-                              ? "EDDYSTONE-UID"
-                              : "IBEACON"}
+                            {rotuloDoProtocolo[beacon.protocol]}
                           </Text>
                           <Text style={{ color: cores.texto, fontWeight: "700" }}>
                             {beacon.rssi} dBm
@@ -181,6 +176,58 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
               )}
             </Secao>
 
+            <Secao titulo={`Todos os dispositivos vistos (${vistos.length})`}>
+              <Legenda>
+                Tudo que o rádio enxergou, inclusive aparelhos de passantes.
+                Serve para achar um beacon que não anuncia formato conhecido —
+                identifique-o pelo nome ou pelo sinal mais forte e cadastre pelo
+                MAC. Esta lista fica só no aparelho; nada daqui é enviado.
+              </Legenda>
+
+              {vistos.slice(0, 15).map((d) => (
+                <Pressable key={d.mac} onPress={() => copiar(d.mac, `mac-${d.mac}`)}>
+                  <Cartao>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: cores.texto,
+                          fontFamily: "monospace",
+                          fontSize: 14,
+                        }}
+                        selectable
+                      >
+                        {d.mac.toUpperCase()}
+                      </Text>
+                      <Text style={{ color: cores.texto, fontWeight: "700" }}>
+                        {d.rssi} dBm
+                      </Text>
+                    </View>
+
+                    <Text style={{ color: cores.textoFraco, fontSize: 13, marginTop: 4 }}>
+                      {d.nome ?? "(sem nome)"}
+                      {d.reconhecido ? ` · ${d.reconhecido.toUpperCase()}` : ""}
+                    </Text>
+
+                    <Text style={{ color: cores.textoFraco, fontSize: 12, marginTop: 6 }}>
+                      {copiado === `mac-${d.mac}` ? "MAC copiado!" : "Toque para copiar o MAC"}
+                      {"  ·  "}
+                      {sugerirLimiar(d.rssi)}
+                    </Text>
+                  </Cartao>
+                </Pressable>
+              ))}
+
+              {vistos.length > 15 && (
+                <Legenda>…e mais {vistos.length - 15} com sinal mais fraco.</Legenda>
+              )}
+            </Secao>
+
             <Secao titulo="GPS">
               {sinais.gps ? (
                 <Pressable
@@ -220,6 +267,47 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
       </View>
     </View>
   );
+}
+
+const rotuloDoProtocolo = {
+  eddystone: "EDDYSTONE-UID",
+  ibeacon: "IBEACON",
+  mac: "ENDEREÇO MAC",
+} as const;
+
+const corDoProtocolo = {
+  eddystone: cores.acento,
+  ibeacon: cores.info,
+  mac: cores.aviso,
+} as const;
+
+/**
+ * Como exibir e copiar o identificador de cada protocolo.
+ *
+ * O `switch` exaustivo é de propósito: um protocolo novo passa a dar erro de
+ * compilação aqui, em vez de aparecer em branco na tela do técnico.
+ */
+function descreverBeacon(beacon: BeaconRelatado): {
+  identificador: string;
+  paraCopiar: string;
+} {
+  switch (beacon.protocol) {
+    case "eddystone":
+      return {
+        identificador: `${beacon.eddystone_namespace} / ${beacon.eddystone_instance}`,
+        paraCopiar: `${beacon.eddystone_namespace}\n${beacon.eddystone_instance}`,
+      };
+    case "ibeacon":
+      return {
+        identificador: `${beacon.ibeacon_uuid}\nmajor ${beacon.ibeacon_major} · minor ${beacon.ibeacon_minor}`,
+        paraCopiar: `${beacon.ibeacon_uuid}\n${beacon.ibeacon_major}\n${beacon.ibeacon_minor}`,
+      };
+    case "mac":
+      return {
+        identificador: beacon.mac_address.toUpperCase(),
+        paraCopiar: beacon.mac_address,
+      };
+  }
 }
 
 /**

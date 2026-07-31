@@ -60,15 +60,23 @@ class LocationMethod(StrEnum):
 
 
 class BeaconProtocol(StrEnum):
-    """Protocolo do advertisement.
+    """Como o beacon e identificado no advertisement.
 
-    Os dois formatos convivem de proposito: a escolha do hardware ainda esta
-    em aberto por causa do risco R1 (iOS nao entrega advertisement de iBeacon
-    via CoreBluetooth), e o backend nao pode ficar refem dessa decisao.
+    Tres modos convivem de proposito, porque a escolha do hardware nao pode
+    travar o backend:
+
+    - EDDYSTONE: namespace + instance. Legivel em Android e iOS — o formato
+      preferido (decisao D8).
+    - IBEACON: uuid + major + minor. Legivel no Android; no iOS so via
+      CoreLocation, com o uuid conhecido de antemao.
+    - MAC: o endereco do radio. Ultimo recurso, para beacons que transmitem
+      formato proprietario que nao sabemos interpretar. **Impossivel no iOS**,
+      que nao expoe MAC de periferico por API nenhuma.
     """
 
     IBEACON = "ibeacon"
     EDDYSTONE = "eddystone"
+    MAC = "mac"
 
 
 class TimeEntryStatus(StrEnum):

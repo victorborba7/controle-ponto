@@ -121,6 +121,9 @@ class BeaconCreate(BaseModel):
 
     @model_validator(mode="after")
     def identificador_coerente_com_o_protocolo(self) -> Self:
+        tem_eddystone = any((self.eddystone_namespace, self.eddystone_instance))
+        tem_ibeacon = any((self.ibeacon_uuid, self.ibeacon_major, self.ibeacon_minor))
+
         if self.protocol is BeaconProtocol.EDDYSTONE:
             faltando = [
                 nome
@@ -131,22 +134,38 @@ class BeaconCreate(BaseModel):
                 if valor is None
             ]
             if faltando:
-                raise ValueError(
-                    f"Beacon Eddystone exige {' e '.join(faltando)}"
-                )
-            if any((self.ibeacon_uuid, self.ibeacon_major, self.ibeacon_minor)):
+                raise ValueError(f"Beacon Eddystone exige {' e '.join(faltando)}")
+            if tem_ibeacon:
                 raise ValueError(
                     "Beacon Eddystone nao deve receber campos de iBeacon. "
                     "Confira o protocolo selecionado."
                 )
             return self
 
-        if self.ibeacon_uuid is None or self.ibeacon_major is None or self.ibeacon_minor is None:
-            raise ValueError("Beacon iBeacon exige uuid, major e minor")
-        if any((self.eddystone_namespace, self.eddystone_instance)):
+        if self.protocol is BeaconProtocol.IBEACON:
+            if (
+                self.ibeacon_uuid is None
+                or self.ibeacon_major is None
+                or self.ibeacon_minor is None
+            ):
+                raise ValueError("Beacon iBeacon exige uuid, major e minor")
+            if tem_eddystone:
+                raise ValueError(
+                    "Beacon iBeacon nao deve receber campos de Eddystone. "
+                    "Confira o protocolo selecionado."
+                )
+            return self
+
+        # MAC
+        if self.mac_address is None:
             raise ValueError(
-                "Beacon iBeacon nao deve receber campos de Eddystone. "
-                "Confira o protocolo selecionado."
+                "Beacon identificado por MAC exige o endereco. Use a tela de "
+                "diagnostico do app para descobri-lo."
+            )
+        if tem_eddystone or tem_ibeacon:
+            raise ValueError(
+                "Beacon identificado por MAC nao deve receber campos de "
+                "Eddystone nem de iBeacon. Confira o protocolo selecionado."
             )
         return self
 
@@ -234,6 +253,11 @@ class BeaconConfig(BaseModel):
 
     Sem o `label`: o nome interno da area nao serve para o app e e informacao
     sobre a planta da empresa que nao precisa sair do painel.
+
+    O `mac_address` vem justamente para o app poder filtrar: numa varredura
+    aberta ele ve dezenas de aparelhos alheios, e so deve relatar ao servidor
+    os que estao cadastrados. Sem esta lista, relatar MAC significaria enviar
+    identificadores de celulares e relogios de terceiros.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -245,6 +269,7 @@ class BeaconConfig(BaseModel):
     ibeacon_uuid: str | None = None
     ibeacon_major: int | None = None
     ibeacon_minor: int | None = None
+    mac_address: str | None = None
     min_rssi: int
 
 

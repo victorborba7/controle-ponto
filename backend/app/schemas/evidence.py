@@ -40,6 +40,8 @@ class BeaconReading(BaseModel):
     ibeacon_major: int | None = Field(default=None, ge=0, le=65535)
     ibeacon_minor: int | None = Field(default=None, ge=0, le=65535)
 
+    mac_address: Bssid | None = None
+
     rssi: int = Field(ge=MIN_RSSI_LIMIT, le=MAX_RSSI_LIMIT)
 
     @model_validator(mode="after")
@@ -47,12 +49,15 @@ class BeaconReading(BaseModel):
         if self.protocol is BeaconProtocol.EDDYSTONE:
             if not (self.eddystone_namespace and self.eddystone_instance):
                 raise ValueError("Leitura Eddystone exige namespace e instance")
-        elif not (
-            self.ibeacon_uuid
-            and self.ibeacon_major is not None
-            and self.ibeacon_minor is not None
-        ):
-            raise ValueError("Leitura iBeacon exige uuid, major e minor")
+        elif self.protocol is BeaconProtocol.IBEACON:
+            if not (
+                self.ibeacon_uuid
+                and self.ibeacon_major is not None
+                and self.ibeacon_minor is not None
+            ):
+                raise ValueError("Leitura iBeacon exige uuid, major e minor")
+        elif not self.mac_address:
+            raise ValueError("Leitura por MAC exige o endereco")
         return self
 
     @property
@@ -64,7 +69,14 @@ class BeaconReading(BaseModel):
         """
         if self.protocol is BeaconProtocol.EDDYSTONE:
             return (self.protocol, self.eddystone_namespace, self.eddystone_instance)
-        return (self.protocol, self.ibeacon_uuid, self.ibeacon_major, self.ibeacon_minor)
+        if self.protocol is BeaconProtocol.IBEACON:
+            return (
+                self.protocol,
+                self.ibeacon_uuid,
+                self.ibeacon_major,
+                self.ibeacon_minor,
+            )
+        return (self.protocol, self.mac_address)
 
 
 class WifiReading(BaseModel):

@@ -122,12 +122,14 @@ async def _find_duplicate_beacon(
             Beacon.eddystone_namespace == payload.eddystone_namespace,
             Beacon.eddystone_instance == payload.eddystone_instance,
         )
-    else:
+    elif payload.protocol is BeaconProtocol.IBEACON:
         query = query.where(
             Beacon.ibeacon_uuid == payload.ibeacon_uuid,
             Beacon.ibeacon_major == payload.ibeacon_major,
             Beacon.ibeacon_minor == payload.ibeacon_minor,
         )
+    else:
+        query = query.where(Beacon.mac_address == payload.mac_address)
 
     return await repo.session.scalar(query.limit(1))
 
