@@ -18,6 +18,7 @@ import { BleManager, State as BleState } from "react-native-ble-plx";
 import { macsConhecidos, sincronizarConfig } from "./configLocal";
 import { consolidar, lerEddystone, type LeituraEddystone } from "./eddystone";
 import { consolidarIBeacons, lerIBeacon, type LeituraIBeacon } from "./ibeacon";
+import { garantirPermissoesBluetooth } from "./permissoes";
 
 /** Tempo de varredura BLE. Curto o bastante para não irritar, longo o bastante
  *  para o anúncio de um beacon (tipicamente a cada 100–1000 ms) aparecer. */
@@ -113,6 +114,16 @@ async function coletarBeacons(
   macsPermitidos: Set<string>,
 ): Promise<Varredura> {
   const vazio: Varredura = { eddystone: [], ibeacon: [], macs: [], vistos: [] };
+
+  // Antes de tocar no radio: sem BLUETOOTH_SCAN concedido em tempo de execucao,
+  // a varredura falha de imediato e devolve zero dispositivos — sintoma que
+  // parece defeito de hardware e nao e.
+  const permissao = await garantirPermissoesBluetooth();
+  if (!permissao.concedida) {
+    avisos.push(permissao.motivo ?? "Sem permissão de Bluetooth.");
+    return vazio;
+  }
+
   const ble = obterBle();
 
   const estado = await ble.state();
@@ -152,7 +163,15 @@ async function coletarBeacons(
       { allowDuplicates: true },
       (erro, dispositivo) => {
         if (erro) {
-          avisos.push("Não foi possível varrer o Bluetooth.");
+          // A mensagem do ble-plx e o que distingue "permissao negada" de
+          // "adaptador desligado" de "hardware nao suporta". Sem ela, a tela
+          // dizia so "não foi possível varrer", que nao ajuda ninguem.
+          const detalhe = erro.reason ?? erro.message ?? "";
+          avisos.push(
+            detalhe
+              ? `Falha na varredura Bluetooth: ${detalhe}`
+              : "Falha na varredura Bluetooth.",
+          );
           clearTimeout(relogio);
           finalizar();
           return;
