@@ -20,11 +20,13 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.api.deps import get_storage
+from app.api.deps import get_engine, get_storage
 from app.core.config import settings
 from app.core.security import hash_password
 from app.db.base import Base
 from app.db.session import get_session
+from app.facial.runner import AsyncFaceEngine
+from app.facial.stub import StubFaceEngine
 from app.main import app
 from app.models import Employee, Site, Tenant, User
 from app.models.enums import UserRole
@@ -114,6 +116,13 @@ async def client(db: AsyncSession, storage: Storage) -> AsyncGenerator[AsyncClie
 
     app.dependency_overrides[get_session] = _override_session
     app.dependency_overrides[get_storage] = lambda: storage
+    # Engine fixada na stub, independentemente de FACE_ENGINE no ambiente.
+    # Estes testes montam cenarios com imagens sinteticas de cor solida, que o
+    # ArcFace corretamente nao reconhece como rosto — sem esta fixacao, a suite
+    # passaria ou falharia conforme qual compose estivesse rodando.
+    # A engine real e verificada em test_facial_real_model.py, com foto de
+    # rosto de verdade.
+    app.dependency_overrides[get_engine] = lambda: AsyncFaceEngine(StubFaceEngine())
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as http_client:

@@ -91,12 +91,17 @@ backend.
 | Engine | Quando usar | Custo |
 |---|---|---|
 | `stub` (padrão) | Desenvolvimento e testes | Nenhum |
-| `insightface` | Validar com rosto de verdade | ~1 GB de libs + ~300 MB de modelo |
+| `insightface` | **Qualquer coisa com rosto de verdade** | ~1 GB de libs + ~300 MB de modelo |
 
-A engine stub trata a **cor dominante da imagem como identidade** — cores
-próximas são a mesma pessoa, cores distantes são pessoas diferentes. Isso
-permite testar toda a canalização (limiares, escolha de template, erros) sem
-baixar modelo. Ela não testa o modelo; isso é feito separadamente.
+> ⚠️ **A engine stub não funciona com foto real, e falha de um jeito enganoso.**
+> Ela trata a *cor dominante* da imagem como identidade — cores próximas são a
+> mesma pessoa, distantes são pessoas diferentes. Uma selfie tem fundo, cabelo,
+> rosto e roupa em cores diferentes, então ela responde **"Mais de um rosto na
+> foto"** mesmo com a pessoa sozinha.
+>
+> Ela existe para exercitar a canalização (limiares, escolha de template, fila,
+> erros) sem baixar 1,3 GB. **Para cadastrar rosto pela webcam ou pelo app, suba
+> a variante facial.**
 
 Para rodar com o modelo real:
 
@@ -106,8 +111,26 @@ docker compose -f docker-compose.yml -f docker-compose.facial.yml \
     exec api pytest tests/test_facial_real_model.py -v
 ```
 
+Para voltar à variante leve:
+
+```bash
+docker compose up -d --build api
+```
+
+Confira qual está no ar — as duas escutam na mesma porta:
+
+```bash
+docker compose exec api python -c "from app.core.config import settings; print(settings.face_engine)"
+```
+
 O modelo é baixado no primeiro uso para o volume `facemodels`, não empacotado
-na imagem — senão cada deploy transferiria 1,3 GB.
+na imagem — senão cada deploy transferiria 1,3 GB. As duas variantes têm nomes
+de imagem distintos (`controle-ponto_api` e `controle-ponto_api_facial`), para
+um `up -d` sem `--build` não reaproveitar a errada.
+
+A suíte de testes usa a engine stub **sempre**, independentemente da variante no
+ar: ela monta cenários com imagens sintéticas, que o ArcFace corretamente não
+reconhece como rosto. O modelo real é verificado em `test_facial_real_model.py`.
 
 ### Credenciais do seed
 

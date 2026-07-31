@@ -283,9 +283,28 @@ async def _match_face(
             user_message=exc.user_message,
         ) from exc
 
+    # Embeddings de modelos diferentes vivem em espacos vetoriais diferentes:
+    # comparar um contra o outro nao da erro (a dimensao coincide), da um score
+    # sem significado nenhum. Filtrar aqui e o que permite trocar de modelo sem
+    # que os templates da geracao anterior contaminem a decisao — e o cenario
+    # da fase edge, que toda a arquitetura antecipa.
+    compativeis = [
+        template
+        for template in templates
+        if template.model_name == embedding.model_name
+        and template.model_version == embedding.model_version
+    ]
+
+    if not compativeis:
+        raise NoFaceTemplatesError(
+            f"Funcionario tem {len(templates)} template(s), mas nenhum do modelo "
+            f"em uso ({embedding.model_name}/{embedding.model_version})",
+            user_message="Seu cadastro facial precisa ser refeito. Procure o RH.",
+        )
+
     candidatos = [
         MatchCandidate(template_id=template.id, vector=template.embedding)
-        for template in templates
+        for template in compativeis
     ]
     resultado = engine.verify_against_templates(
         embedding.vector,

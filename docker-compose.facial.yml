@@ -11,6 +11,12 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.facial
+    # Nome proprio, e nao o derivado do projeto. Sem isto as duas variantes
+    # gerariam a MESMA tag (`controle-ponto_api`), e um `up -d` sem `--build`
+    # reaproveitaria silenciosamente a imagem errada — subindo o container com
+    # FACE_ENGINE=insightface mas sem o insightface instalado, que so falha no
+    # primeiro cadastro de rosto.
+    image: controle-ponto_api_facial
     environment:
       FACE_ENGINE: insightface
     volumes:
