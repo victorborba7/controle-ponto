@@ -8,6 +8,7 @@ import {
   type DispositivoVisto,
   type SinaisColetados,
 } from "../services/localizacao";
+import { varrerCru, type ResultadoCru } from "../services/varreduraCrua";
 import { Aviso, Botao, Cartao, Legenda, Titulo, cores } from "../ui";
 
 /**
@@ -28,6 +29,25 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
   const [avisos, setAvisos] = useState<string[]>([]);
   const [etapa, setEtapa] = useState<string | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
+  const [cru, setCru] = useState<ResultadoCru | null>(null);
+  const [varrendoCru, setVarrendoCru] = useState(false);
+
+  /**
+   * Varredura sem filtro nem interpretação, por mais tempo.
+   *
+   * Responde "o anúncio chega ao app?", que é pergunta diferente de "o app
+   * entende o anúncio?". Quando um beacon some, é o descarte que esconde a
+   * causa — aqui nada é descartado.
+   */
+  const varrerCruamente = useCallback(async () => {
+    setVarrendoCru(true);
+    setCru(null);
+    try {
+      setCru(await varrerCru(12_000));
+    } finally {
+      setVarrendoCru(false);
+    }
+  }, []);
 
   const varrer = useCallback(async () => {
     setSinais(null);
@@ -67,6 +87,72 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
           onPress={varrer}
           carregando={etapa !== null}
         />
+
+        <Botao
+          titulo={cru ? "Varrer de novo (12s, cru)" : "Varredura crua (12s)"}
+          variante="secundario"
+          onPress={varrerCruamente}
+          carregando={varrendoCru}
+        />
+
+        {cru && (
+          <Cartao>
+            <Text style={{ color: cores.texto, fontWeight: "700", marginBottom: 8 }}>
+              Varredura crua
+            </Text>
+            <Text style={{ color: cores.textoFraco, fontSize: 13, lineHeight: 19 }}>
+              {cru.parametros}
+              {"\n"}
+              {cru.anunciosRecebidos} anúncio(s) recebido(s) ·{" "}
+              {cru.dispositivos.length} dispositivo(s)
+            </Text>
+            {cru.erro && (
+              <Text style={{ color: cores.erro, fontSize: 13, marginTop: 8 }}>
+                Erro: {cru.erro}
+              </Text>
+            )}
+          </Cartao>
+        )}
+
+        {cru?.dispositivos.map((d) => (
+          <Pressable key={d.id} onPress={() => copiar(d.id, `cru-${d.id}`)}>
+            <Cartao>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{ color: cores.texto, fontFamily: "monospace", fontSize: 14 }}
+                  selectable
+                >
+                  {d.id.toUpperCase()}
+                </Text>
+                <Text style={{ color: cores.texto, fontWeight: "700" }}>
+                  {d.rssi ?? "—"} dBm
+                </Text>
+              </View>
+
+              <Text style={{ color: cores.textoFraco, fontSize: 13, marginTop: 4 }}>
+                {d.nome ?? d.nomeLocal ?? "(sem nome)"} · {d.anuncios} anúncio(s)
+              </Text>
+
+              <Text style={{ color: cores.textoFraco, fontSize: 12, marginTop: 4 }}>
+                {d.temManufacturerData
+                  ? `fabricante: ${d.fabricante}`
+                  : "sem manufacturerData"}
+                {d.temServiceData ? " · com serviceData" : ""}
+                {d.serviceUUIDs.length ? ` · ${d.serviceUUIDs.length} serviço(s)` : ""}
+              </Text>
+
+              <Text style={{ color: cores.textoFraco, fontSize: 12, marginTop: 6 }}>
+                {copiado === `cru-${d.id}` ? "Copiado!" : "Toque para copiar"}
+              </Text>
+            </Cartao>
+          </Pressable>
+        ))}
 
         {avisos.map((aviso) => (
           <Aviso key={aviso} tipo="aviso">

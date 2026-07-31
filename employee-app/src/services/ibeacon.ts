@@ -83,20 +83,54 @@ export function lerIBeacon(
   if (!manufacturerData || rssi === null) return null;
 
   const bytes = base64ParaBytes(manufacturerData);
-  if (bytes.length < TAMANHO_MINIMO) return null;
-
-  // Company ID vem em little endian.
-  const companyId = bytes[0] | (bytes[1] << 8);
-  if (companyId !== COMPANY_ID_APPLE) return null;
-  if (bytes[2] !== SUBTIPO_IBEACON || bytes[3] !== COMPRIMENTO_IBEACON) return null;
+  const inicio = acharInicioDoPayload(bytes);
+  if (inicio === null) return null;
 
   return {
-    uuid: formatarUuid(bytes.slice(4, 20)),
+    uuid: formatarUuid(bytes.slice(inicio + 2, inicio + 18)),
     // Major e minor em big endian, ao contrário do company ID.
-    major: (bytes[20] << 8) | bytes[21],
-    minor: (bytes[22] << 8) | bytes[23],
+    major: (bytes[inicio + 18] << 8) | bytes[inicio + 19],
+    minor: (bytes[inicio + 20] << 8) | bytes[inicio + 21],
     rssi,
   };
+}
+
+/**
+ * Onde começa o payload do iBeacon (o byte `0x02` de subtipo).
+ *
+ * Duas formas convivem no mundo real, e a diferença decide se o beacon é
+ * reconhecido ou some sem erro nenhum:
+ *
+ * - **Com o company ID** — `4C 00 02 15 <uuid> <major> <minor> <power>`. É o
+ *   que sai quando a biblioteca entrega a estrutura de anúncio crua.
+ * - **Sem o company ID** — `02 15 <uuid> ...`. É o que sai quando o Android
+ *   já separou os dados por fabricante (`getManufacturerSpecificData` devolve
+ *   um mapa indexado pelo company ID, com o valor já sem ele).
+ *
+ * Aceitar as duas custa cinco linhas e evita um modo de falha silencioso, em
+ * que o beacon nunca aparece e nada indica o porquê.
+ */
+function acharInicioDoPayload(bytes: Uint8Array): number | null {
+  // Forma com company ID: 4C 00 02 15
+  if (
+    bytes.length >= TAMANHO_MINIMO &&
+    (bytes[0] | (bytes[1] << 8)) === COMPANY_ID_APPLE &&
+    bytes[2] === SUBTIPO_IBEACON &&
+    bytes[3] === COMPRIMENTO_IBEACON
+  ) {
+    return 2;
+  }
+
+  // Forma sem company ID: 02 15
+  if (
+    bytes.length >= TAMANHO_MINIMO - 2 &&
+    bytes[0] === SUBTIPO_IBEACON &&
+    bytes[1] === COMPRIMENTO_IBEACON
+  ) {
+    return 0;
+  }
+
+  return null;
 }
 
 /** Consolida leituras repetidas do mesmo beacon, ficando com o sinal mais forte. */
