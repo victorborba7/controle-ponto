@@ -3,7 +3,7 @@
 > Documento de execução. O "o quê" e o "porquê" estão em [CLAUDE.MD](CLAUDE.MD).
 > Aqui está o **como** e em **que ordem**.
 
-**Status geral:** `🏁 Backend do MVP funcional (etapas 0 a 7) — Etapa 8 a seguir`
+**Status geral:** `Etapas 0 a 8 concluídas — Etapa 9 a seguir (app do funcionário)`
 **Última atualização:** 2026-07-30
 
 ---
@@ -397,7 +397,7 @@ Postgres + API respondendo.
 | 5 — Locais e beacons | 🟢 concluída | 2026-07-30 |
 | 6 — Validação de localização | 🟢 concluída | 2026-07-30 |
 | 7 — Bater ponto | 🟢 concluída | 2026-07-30 |
-| 8 — Painel admin | ⚪ não iniciada | |
+| 8 — Painel admin | 🟢 concluída | 2026-07-30 |
 | 9 — App do funcionário (Android) | ⚪ não iniciada | |
 | 9b — Paridade no iOS | ⚪ não iniciada | |
 | 10 — Liveness | ⚪ não iniciada | |

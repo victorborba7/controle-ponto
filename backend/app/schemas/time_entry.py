@@ -68,6 +68,10 @@ class TimeEntryReview(BaseModel):
 
     approved: bool
     note: str | None = Field(default=None, max_length=1000)
+    # Correcao do horario, necessaria para batidas enviadas com atraso: elas
+    # chegam com o horario do envio, nao o da batida (ver a limitacao descrita
+    # em services/time_entry.py). O valor anterior fica na trilha de auditoria.
+    corrected_recorded_at: datetime | None = None
 
 
 class TimeEntryCreated(BaseModel):

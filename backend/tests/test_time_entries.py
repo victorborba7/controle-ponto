@@ -674,6 +674,187 @@ async def test_revisao_registra_quem_decidiu(
 
 
 # --------------------------------------------------------------------------
+# O que o painel consome
+# --------------------------------------------------------------------------
+
+
+async def test_painel_busca_a_foto_do_registro(client: AsyncClient, cenario: dict):
+    """Servida pela API, e nao por URL do storage: a imagem e dado biometrico."""
+    ponto = await bater_ponto(client, cenario)
+    entry_id = ponto.json()["entry"]["id"]
+
+    foto = await client.get(
+        f"/api/v1/time-entries/{entry_id}/selfie", headers=cenario["admin"]
+    )
+
+    assert foto.status_code == 200
+    assert foto.headers["content-type"].startswith("image/")
+    assert foto.content.startswith(b"\x89PNG")
+    # Sem copia em disco do navegador.
+    assert "no-store" in foto.headers["cache-control"]
+
+
+async def test_foto_de_outra_empresa_nao_e_servida(
+    client: AsyncClient, db: AsyncSession, cenario: dict
+):
+    ponto = await bater_ponto(client, cenario)
+    entry_id = ponto.json()["entry"]["id"]
+
+    outra = await create_tenant(db, slug="vizinha3")
+    await create_admin(db, outra, email="rh@vizinha3.com")
+    await db.commit()
+    login = await login_admin(client, outra, "rh@vizinha3.com")
+
+    foto = await client.get(
+        f"/api/v1/time-entries/{entry_id}/selfie", headers=auth_header(login["tokens"])
+    )
+    assert foto.status_code == 404
+
+
+async def test_funcionario_nao_busca_foto_de_ponto(client: AsyncClient, cenario: dict):
+    ponto = await bater_ponto(client, cenario)
+    entry_id = ponto.json()["entry"]["id"]
+
+    foto = await client.get(
+        f"/api/v1/time-entries/{entry_id}/selfie", headers=cenario["app"]
+    )
+    assert foto.status_code == 403
+
+
+async def test_rh_corrige_o_horario_de_uma_batida_atrasada(
+    client: AsyncClient, db: AsyncSession, cenario: dict
+):
+    """O caso que motiva a funcionalidade: batida represada em area sem sinal.
+
+    Ela chega com o horario do envio; sem correcao, o espelho de ponto ficaria
+    errado justamente onde o funcionario nao teve culpa.
+    """
+    batida_real = datetime.now(UTC) - timedelta(hours=3)
+    pendente = await bater_ponto(client, cenario, client_recorded_at=batida_real)
+    entry_id = pendente.json()["entry"]["id"]
+    horario_do_envio = pendente.json()["entry"]["recorded_at"]
+
+    revisao = await client.patch(
+        f"/api/v1/time-entries/{entry_id}/review",
+        headers=cenario["admin"],
+        json={
+            "approved": True,
+            "note": "Sem sinal no hangar; horario ajustado",
+            "corrected_recorded_at": batida_real.isoformat(),
+        },
+    )
+
+    assert revisao.status_code == 200
+    assert revisao.json()["recorded_at"] != horario_do_envio
+
+    entry = await db.scalar(select(TimeEntry).where(TimeEntry.id == uuid.UUID(entry_id)))
+    assert abs((entry.recorded_at - batida_real).total_seconds()) < 2
+
+
+async def test_correcao_de_horario_fica_na_trilha(
+    client: AsyncClient, db: AsyncSession, cenario: dict
+):
+    """Sem os dois valores, uma batida ajustada seria indistinguivel de uma original."""
+    batida_real = datetime.now(UTC) - timedelta(hours=3)
+    pendente = await bater_ponto(client, cenario, client_recorded_at=batida_real)
+    entry_id = pendente.json()["entry"]["id"]
+
+    await client.patch(
+        f"/api/v1/time-entries/{entry_id}/review",
+        headers=cenario["admin"],
+        json={"approved": True, "corrected_recorded_at": batida_real.isoformat()},
+    )
+
+    registros = (await db.execute(select(AuditLog))).scalars().all()
+    revisoes = [r for r in registros if r.payload and "horario_corrigido" in r.payload]
+
+    assert len(revisoes) == 1
+    correcao = revisoes[0].payload["horario_corrigido"]
+    assert correcao["de"] != correcao["para"]
+
+
+async def test_exportacao_csv(client: AsyncClient, db: AsyncSession, cenario: dict):
+    await bater_ponto(client, cenario, evidence=com_beacon())
+
+    entry = await db.scalar(select(TimeEntry))
+    entry.recorded_at = datetime.now(UTC) - timedelta(hours=8)
+    await db.commit()
+
+    await bater_ponto(client, cenario, evidence=com_gps())
+
+    csv_resposta = await client.get(
+        "/api/v1/time-entries/export/csv", headers=cenario["admin"]
+    )
+
+    assert csv_resposta.status_code == 200
+    assert "attachment" in csv_resposta.headers["content-disposition"]
+
+    texto = csv_resposta.text
+    linhas = [linha for linha in texto.splitlines() if linha.strip()]
+
+    assert linhas[0].startswith("﻿") or texto.startswith("﻿")
+    assert "Metodo de localizacao" in linhas[0]
+    assert len(linhas) == 3  # cabecalho + duas batidas
+    assert "Beacon" in texto
+    assert "GPS" in texto
+    assert "Joao" in texto
+
+
+async def test_csv_usa_o_formato_que_o_excel_em_portugues_espera(
+    client: AsyncClient, cenario: dict
+):
+    """Ponto decimal e virgula separadora fariam a planilha abrir numa coluna so."""
+    await bater_ponto(client, cenario)
+
+    texto = (
+        await client.get("/api/v1/time-entries/export/csv", headers=cenario["admin"])
+    ).text
+    linha_de_dados = [linha for linha in texto.splitlines() if "Joao" in linha][0]
+
+    assert ";" in linha_de_dados
+    assert "0,95" in linha_de_dados  # confianca do beacon, com virgula decimal
+
+
+async def test_csv_respeita_os_filtros(
+    client: AsyncClient, db: AsyncSession, cenario: dict
+):
+    await bater_ponto(client, cenario, evidence=com_beacon())
+
+    entry = await db.scalar(select(TimeEntry))
+    entry.recorded_at = datetime.now(UTC) - timedelta(hours=8)
+    await db.commit()
+
+    await bater_ponto(client, cenario, evidence=SEM_SINAL)
+
+    apenas_pendentes = await client.get(
+        "/api/v1/time-entries/export/csv?status=pending_review",
+        headers=cenario["admin"],
+    )
+    linhas = [linha for linha in apenas_pendentes.text.splitlines() if linha.strip()]
+
+    assert len(linhas) == 2  # cabecalho + a pendente
+    assert "Em revisao" in apenas_pendentes.text
+
+
+async def test_csv_nao_mistura_empresas(
+    client: AsyncClient, db: AsyncSession, cenario: dict
+):
+    await bater_ponto(client, cenario)
+
+    outra = await create_tenant(db, slug="vizinha4")
+    await create_admin(db, outra, email="rh@vizinha4.com")
+    await db.commit()
+    login = await login_admin(client, outra, "rh@vizinha4.com")
+
+    csv_resposta = await client.get(
+        "/api/v1/time-entries/export/csv", headers=auth_header(login["tokens"])
+    )
+    linhas = [linha for linha in csv_resposta.text.splitlines() if linha.strip()]
+
+    assert len(linhas) == 1  # so o cabecalho
+
+
+# --------------------------------------------------------------------------
 # Isolamento entre empresas
 # --------------------------------------------------------------------------
 

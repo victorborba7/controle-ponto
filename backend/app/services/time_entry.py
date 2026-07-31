@@ -337,18 +337,47 @@ async def review_entry(
     reviewer_id: uuid.UUID,
     approved: bool,
     note: str | None,
-) -> TimeEntry:
+    corrected_recorded_at: datetime | None = None,
+) -> tuple[TimeEntry, datetime | None]:
     """Decisao do RH sobre uma pendencia.
 
     Quem revisou e quando ficam gravados: uma aprovacao sem autor nao serve
     como defesa em discussao trabalhista.
+
+    Devolve tambem o horario anterior quando houve correcao, para o chamador
+    registra-lo na trilha — sem isso, uma batida ajustada de 10:30 para 08:00
+    ficaria indistinguivel de uma batida que sempre foi 08:00.
     """
+    horario_anterior: datetime | None = None
+
+    if corrected_recorded_at is not None:
+        horario_anterior = entry.recorded_at
+        entry.recorded_at = corrected_recorded_at
+
     entry.status = TimeEntryStatus.APPROVED if approved else TimeEntryStatus.REJECTED
     entry.reviewed_by_user_id = reviewer_id
     entry.reviewed_at = datetime.now(UTC)
     entry.review_note = note
     await session.flush()
-    return entry
+    return entry, horario_anterior
+
+
+async def load_selfie(storage: Storage, entry: TimeEntry) -> bytes | None:
+    """Le a selfie de um registro, decifrando-a.
+
+    None quando a imagem ja expirou pela politica de retencao (Etapa 11): o
+    ponto sobrevive ao expurgo da foto, entao a ausencia e um estado normal e
+    nao um erro.
+    """
+    if not entry.selfie_image_key:
+        return None
+
+    from app.services.storage import ObjectNotFoundError
+
+    try:
+        return await storage.load(entry.selfie_image_key)
+    except ObjectNotFoundError:
+        return None
 
 
 async def load_employees_for(

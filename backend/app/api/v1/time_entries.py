@@ -6,7 +6,7 @@ token valido nao pode registrar presenca por ninguem.
 """
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import (
     APIRouter,
@@ -16,6 +16,7 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
+    Response,
     UploadFile,
     status,
 )
@@ -316,13 +317,23 @@ async def review(
             detail=f"Este registro nao esta pendente (situacao atual: {entry.status.value})",
         )
 
-    await service.review_entry(
+    _, horario_anterior = await service.review_entry(
         session,
         entry,
         reviewer_id=principal.subject_id,
         approved=payload.approved,
         note=payload.note,
+        corrected_recorded_at=payload.corrected_recorded_at,
     )
+
+    trilha: dict = {"aprovado": payload.approved}
+    if horario_anterior is not None:
+        # Sem os dois valores, uma batida ajustada de 10:30 para 08:00 ficaria
+        # indistinguivel de uma que sempre foi 08:00.
+        trilha["horario_corrigido"] = {
+            "de": horario_anterior.isoformat(),
+            "para": entry.recorded_at.isoformat(),
+        }
 
     await audit.record_for(
         session,
@@ -330,7 +341,7 @@ async def review(
         action=AuditAction.REVIEW,
         entity_type="time_entry",
         entity_id=entry.id,
-        payload={"aprovado": payload.approved},
+        payload=trilha,
         description=payload.note,
         ip_address=_client_ip(request),
     )
@@ -338,6 +349,155 @@ async def review(
     employees = await service.load_employees_for(session, [entry])
     sites = await _load_sites(repo, [entry])
     return _with_names(entry, employees, sites)
+
+
+@router.get("/{entry_id}/selfie", response_class=Response)
+async def get_selfie(
+    entry_id: uuid.UUID,
+    _: CurrentAdmin,
+    repo: TenantRepo,
+    storage: StorageDep,
+) -> Response:
+    """Foto do momento da batida, decifrada.
+
+    Servida pela API, e nao por URL direta no storage: a imagem e dado
+    biometrico e so pode sair com o token do painel da propria empresa.
+
+    `no-store` no cache para o navegador nao deixar copia em disco.
+    """
+    entry = await _entry_or_404(repo, entry_id)
+    imagem = await service.load_selfie(storage, entry)
+
+    if imagem is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="A foto deste registro nao esta mais disponivel",
+        )
+
+    return Response(
+        content=imagem,
+        media_type="image/jpeg" if imagem[:2] == b"\xff\xd8" else "image/png",
+        headers={"Cache-Control": "no-store, private"},
+    )
+
+
+@router.get("/export/csv", response_class=Response)
+async def export_csv(
+    _: CurrentAdmin,
+    repo: TenantRepo,
+    session: SessionDep,
+    employee_id: uuid.UUID | None = Query(default=None),
+    site_id: uuid.UUID | None = Query(default=None),
+    entry_status: TimeEntryStatus | None = Query(default=None, alias="status"),
+    location_method: LocationMethod | None = Query(default=None),
+    start: datetime | None = Query(default=None),
+    end: datetime | None = Query(default=None),
+) -> Response:
+    """Exporta os pontos do periodo em CSV.
+
+    Traz o metodo de localizacao, a confianca e o score facial em colunas
+    proprias: um espelho de ponto que so mostra horarios nao permite ao RH
+    defender nem contestar um registro.
+
+    Sem paginacao — exportacao parcial e a origem de fechamento de folha
+    errado. O limite duro evita que um filtro amplo demais derrube a API.
+    """
+    import csv
+    import io
+
+    query = service.build_query(
+        repo,
+        employee_id=employee_id,
+        site_id=site_id,
+        status=entry_status,
+        location_method=location_method,
+        start=start,
+        end=end,
+    )
+    result = await repo.session.execute(query.limit(50_000))
+    entries = list(result.scalars().all())
+
+    employees = await service.load_employees_for(session, entries)
+    sites = await _load_sites(repo, entries)
+
+    buffer = io.StringIO()
+    # `;` e `\r\n` porque o Excel em portugues abre CSV com virgula numa coluna
+    # so — e a planilha e aberta no Excel, nao lida por um programa.
+    writer = csv.writer(buffer, delimiter=";", lineterminator="\r\n")
+    writer.writerow(
+        [
+            "Matricula",
+            "Funcionario",
+            "Data/hora",
+            "Tipo",
+            "Situacao",
+            "Local",
+            "Metodo de localizacao",
+            "Confianca",
+            "Score facial",
+            "Distancia (m)",
+            "RSSI",
+            "Observacao",
+        ]
+    )
+
+    for entry in entries:
+        employee = employees.get(entry.employee_id)
+        site = sites.get(entry.site_id) if entry.site_id else None
+        writer.writerow(
+            [
+                employee.external_code if employee else "-",
+                employee.name if employee else "(removido)",
+                entry.recorded_at.strftime("%d/%m/%Y %H:%M:%S"),
+                _ENTRY_TYPE_LABEL.get(entry.entry_type, entry.entry_type.value),
+                _STATUS_LABEL.get(entry.status, entry.status.value),
+                site.name if site else "",
+                _METHOD_LABEL.get(entry.location_method, entry.location_method.value),
+                _decimal(entry.location_confidence),
+                _decimal(entry.face_match_score),
+                _decimal(entry.distance_to_site_m, casas=0),
+                entry.beacon_rssi if entry.beacon_rssi is not None else "",
+                entry.review_note or entry.decision_reason or "",
+            ]
+        )
+
+    momento = datetime.now(UTC).strftime("%Y%m%d-%H%M")
+    return Response(
+        # BOM para o Excel reconhecer UTF-8 e nao quebrar os acentos.
+        content="﻿" + buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="pontos-{momento}.csv"'
+        },
+    )
+
+
+_ENTRY_TYPE_LABEL = {
+    EntryType.IN: "Entrada",
+    EntryType.OUT: "Saida",
+    EntryType.BREAK_START: "Inicio do intervalo",
+    EntryType.BREAK_END: "Fim do intervalo",
+}
+
+_STATUS_LABEL = {
+    TimeEntryStatus.APPROVED: "Aprovado",
+    TimeEntryStatus.PENDING_REVIEW: "Em revisao",
+    TimeEntryStatus.REJECTED: "Rejeitado",
+}
+
+_METHOD_LABEL = {
+    LocationMethod.BEACON: "Beacon",
+    LocationMethod.WIFI: "Wi-Fi",
+    LocationMethod.GPS: "GPS",
+    LocationMethod.NONE: "Nenhum",
+}
+
+
+def _decimal(valor: float | None, casas: int = 2) -> str:
+    """Numero com virgula decimal, que e o que o Excel em portugues espera."""
+    if valor is None:
+        return ""
+    return f"{valor:.{casas}f}".replace(".", ",")
 
 
 # --------------------------------------------------------------------------
