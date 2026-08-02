@@ -27,8 +27,38 @@ export type RespostaPonto = {
 
 export type ResultadoEnvio =
   | { situacao: "enviado"; resposta: RespostaPonto }
-  | { situacao: "enfileirado"; motivo: string }
+  | {
+      situacao: "enfileirado";
+      motivo: string;
+      /**
+       * Se a batida ficou na fila por falta de rede mesmo.
+       *
+       * Separa dois casos que a fila trata igual mas que a pessoa precisa
+       * distinguir: sem sinal se resolve sozinho quando o sinal voltar;
+       * qualquer outra falha não se resolve nunca, e chamá-la de "sem conexão"
+       * manda alguém esperar por um sinal que já está lá.
+       */
+      ehFalhaDeRede: boolean;
+    }
   | { situacao: "recusado"; motivo: string };
+
+/**
+ * O servidor está inalcançável, ou algo mais deu errado?
+ *
+ * Só falha no nível do `fetch` conta como falta de rede: o React Native lança
+ * `TypeError` quando não consegue abrir a conexão. Um 5xx, ao contrário, prova
+ * que o servidor foi alcançado — e um erro de configuração (URL da API
+ * ausente no build, por exemplo) nem chega a tentar.
+ */
+export function ehFalhaDeRede(erro: unknown): boolean {
+  if (erro instanceof ApiError) return false;
+
+  const mensagem = erro instanceof Error ? erro.message : String(erro);
+  return (
+    erro instanceof TypeError ||
+    /network request failed|failed to fetch|timeout|timed out/i.test(mensagem)
+  );
+}
 
 function montarFormulario(batida: BatidaPendente): FormData {
   const dados = new FormData();
@@ -86,6 +116,7 @@ export async function baterPonto(
       situacao: "enfileirado",
       motivo:
         erro instanceof Error ? erro.message : "Sem conexão com o servidor",
+      ehFalhaDeRede: ehFalhaDeRede(erro),
     };
   }
 }

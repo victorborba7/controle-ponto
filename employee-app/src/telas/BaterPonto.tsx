@@ -112,11 +112,17 @@ export function BaterPonto({
     if (resultado.situacao === "enfileirado") {
       // Falha de rede não é erro para quem bateu o ponto: o registro está
       // guardado e sobe sozinho. Dizer "falhou" faria a pessoa bater de novo.
+      //
+      // Mas dizer "sem conexão" para toda falha é pior: manda a pessoa esperar
+      // por um sinal que já está lá, e esconde de quem instala o sistema a
+      // única pista do que quebrou. O registro está guardado nos dois casos —
+      // muda o que se deve fazer a respeito.
       setEtapa({
         nome: "concluido",
         titulo: "Ponto guardado",
-        mensagem:
-          "Sem conexão agora. O registro foi salvo com o horário de agora e será enviado assim que houver sinal.",
+        mensagem: resultado.ehFalhaDeRede
+          ? "Sem conexão agora. O registro foi salvo com o horário de agora e será enviado assim que houver sinal."
+          : `O registro foi salvo com o horário de agora e será reenviado, mas o servidor não aceitou o envio: ${resultado.motivo}`,
         tipo: "aviso",
       });
       return;

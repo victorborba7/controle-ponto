@@ -41,6 +41,25 @@ ipconfig            # procure o IPv4 do adaptador Wi-Fi
 EXPO_PUBLIC_API_URL=http://192.168.3.27:8000
 ```
 
+> ### O `.env` sozinho não chega ao APK
+>
+> `.env` está no `.gitignore`, e o EAS envia o projeto **pelo git** — então a
+> variável não entra no build. O mesmo valor precisa estar em `eas.json`, no
+> perfil usado:
+>
+> ```json
+> "development": {
+>   "env": { "EXPO_PUBLIC_API_URL": "http://192.168.3.27:8000" }
+> }
+> ```
+>
+> **Ao trocar de rede ou de máquina, os dois precisam mudar.**
+>
+> O sintoma de esquecer o `eas.json` é enganoso: rodando com
+> `npx expo start --dev-client`, o JS vem do Metro e carrega o `.env` **desta
+> máquina**, então tudo funciona. Abrindo o app sozinho, ele usa o bundle
+> embutido, sem a variável — e as batidas caem na fila local sem nunca subir.
+
 O backend precisa aceitar conexões de fora do container:
 
 ```bash
