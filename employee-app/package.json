@@ -20,16 +20,13 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
-    "eslint": "^9.0.0",
-    "eslint-config-expo": "~57.0.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web",
-    "lint": "expo lint"
+    "web": "expo start --web"
   },
   "private": true
 }
