@@ -1,6 +1,6 @@
 import * as Clipboard from "expo-clipboard";
-import { useCallback, useRef, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import {
   coletarSinais,
@@ -13,7 +13,7 @@ import {
   varrerCru,
   type ResultadoCru,
 } from "../services/varreduraCrua";
-import { Aviso, Botao, Cartao, Legenda, Titulo, cores } from "../ui";
+import { Aviso, Botao, Cartao, Legenda, Titulo, cores, estilosCampo } from "../ui";
 
 /**
  * Diagnóstico dos sinais do local.
@@ -36,6 +36,30 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
   const [cru, setCru] = useState<ResultadoCru | null>(null);
   const [varrendoCru, setVarrendoCru] = useState(false);
   const [rotacao, setRotacao] = useState<string[]>([]);
+  const [filtro, setFiltro] = useState("");
+
+  const reconhecidos = cru?.dispositivos.filter((d) => d.reconhecido).length ?? 0;
+
+  /**
+   * Filtro por texto livre, sobre tudo que o dispositivo mostra.
+   *
+   * Numa varredura real aparecem dezenas de aparelhos; procurar um beacon
+   * específico rolando a lista é inviável. Busca também nos bytes do anúncio,
+   * que é como se acha um beacon cujo MAC mudou.
+   */
+  const dispositivosFiltrados = useMemo(() => {
+    const alvo = filtro.trim().toLowerCase().replace(/[:\s-]/g, "");
+    if (!cru) return [];
+    if (!alvo) return cru.dispositivos;
+
+    return cru.dispositivos.filter((d) =>
+      [d.id, d.nome, d.nomeLocal, d.reconhecido, d.manufacturerHex, d.serviceDataHex]
+        .filter(Boolean)
+        .some((campo) =>
+          String(campo).toLowerCase().replace(/[:\s-]/g, "").includes(alvo),
+        ),
+    );
+  }, [cru, filtro]);
 
   /**
    * Endereços já vistos para cada identidade de beacon, entre varreduras.
@@ -131,11 +155,36 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
                 Erro: {cru.erro}
               </Text>
             )}
+            <Text
+              style={{
+                color: reconhecidos > 0 ? cores.acento : cores.aviso,
+                fontSize: 13,
+                fontWeight: "600",
+                marginTop: 8,
+              }}
+            >
+              {reconhecidos > 0
+                ? `${reconhecidos} reconhecido(s) como beacon — aparecem no topo`
+                : "Nenhum anúncio de beacon entre eles"}
+            </Text>
+
             <Text style={{ color: cores.textoFraco, fontSize: 12, marginTop: 8 }}>
               Varra duas vezes com alguns minutos de intervalo: se um beacon
               reaparecer sob outro endereço, ele rotaciona o MAC.
             </Text>
           </Cartao>
+        )}
+
+        {cru && cru.dispositivos.length > 0 && (
+          <TextInput
+            style={estilosCampo.entrada}
+            value={filtro}
+            onChangeText={setFiltro}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="Filtrar por MAC, nome ou bytes do anúncio"
+            placeholderTextColor={cores.textoFraco}
+          />
         )}
 
         {rotacao.map((aviso) => (
@@ -144,7 +193,7 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
           </Aviso>
         ))}
 
-        {cru?.dispositivos.map((d) => (
+        {dispositivosFiltrados.map((d) => (
           <Pressable key={d.id} onPress={() => copiar(d.id, `cru-${d.id}`)}>
             <Cartao>
               <View

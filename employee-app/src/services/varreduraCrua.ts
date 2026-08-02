@@ -197,9 +197,15 @@ export async function varrerCru(duracaoMs = 12_000): Promise<ResultadoCru> {
       ble.stopDeviceScan();
       ble.destroy();
       resolve({
-        dispositivos: Array.from(encontrados.values()).sort(
-          (a, b) => (b.rssi ?? -999) - (a.rssi ?? -999),
-        ),
+        // Beacons reconhecidos primeiro, e só depois por sinal. Numa varredura
+        // de hangar aparecem dezenas de aparelhos, e ordenar só por RSSI
+        // enterra o beacon procurado no meio de fones e televisores.
+        dispositivos: Array.from(encontrados.values()).sort((a, b) => {
+          const pesoA = a.reconhecido ? 1 : 0;
+          const pesoB = b.reconhecido ? 1 : 0;
+          if (pesoA !== pesoB) return pesoB - pesoA;
+          return (b.rssi ?? -999) - (a.rssi ?? -999);
+        }),
         anunciosRecebidos,
         duracaoMs,
         erro,
