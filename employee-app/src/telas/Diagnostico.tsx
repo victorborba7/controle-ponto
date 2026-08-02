@@ -10,7 +10,9 @@ import {
 } from "../services/localizacao";
 import {
   detectarRotacao,
+  varrerComparando,
   varrerCru,
+  type ResultadoComparado,
   type ResultadoCru,
 } from "../services/varreduraCrua";
 import { Aviso, Botao, Cartao, Legenda, Titulo, cores, estilosCampo } from "../ui";
@@ -37,6 +39,8 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
   const [varrendoCru, setVarrendoCru] = useState(false);
   const [rotacao, setRotacao] = useState<string[]>([]);
   const [filtro, setFiltro] = useState("");
+  const [comparado, setComparado] = useState<ResultadoComparado | null>(null);
+  const [comparando, setComparando] = useState(false);
 
   const reconhecidos = cru?.dispositivos.filter((d) => d.reconhecido).length ?? 0;
 
@@ -53,7 +57,7 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
     if (!alvo) return cru.dispositivos;
 
     return cru.dispositivos.filter((d) =>
-      [d.id, d.nome, d.nomeLocal, d.reconhecido, d.manufacturerHex, d.serviceDataHex]
+      [d.id, d.nome, d.nomeLocal, d.reconhecido, ...d.payloads, ...d.payloadsServico]
         .filter(Boolean)
         .some((campo) =>
           String(campo).toLowerCase().replace(/[:\s-]/g, "").includes(alvo),
@@ -90,6 +94,27 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
       );
     } finally {
       setVarrendoCru(false);
+    }
+  }, []);
+
+  /**
+   * Duas varreduras variando só o parâmetro `legacy` do rádio.
+   *
+   * É a única diferença conhecida entre o que este app pede ao Android e o
+   * que o nRF Connect pede. Testar isso elimina ou confirma a hipótese sem
+   * depender de reinstalar o app com o parâmetro trocado.
+   */
+  const compararParametros = useCallback(async () => {
+    setComparando(true);
+    setComparado(null);
+    try {
+      const resultado = await varrerComparando(8_000);
+      setComparado(resultado);
+      // A passada abrangente vê tudo que a outra vê, então é a melhor lista
+      // para inspecionar depois.
+      setCru(resultado.passadas[1]?.resultado ?? null);
+    } finally {
+      setComparando(false);
     }
   }, []);
 
@@ -138,6 +163,38 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
           onPress={varrerCruamente}
           carregando={varrendoCru}
         />
+
+        <Botao
+          titulo="Comparar parâmetros (2 × 8s)"
+          variante="secundario"
+          onPress={compararParametros}
+          carregando={comparando}
+        />
+
+        {comparado && (
+          <Cartao>
+            <Text style={{ color: cores.texto, fontWeight: "700", marginBottom: 8 }}>
+              Comparação de parâmetros
+            </Text>
+            {comparado.conclusoes.map((linha) => (
+              <Text
+                key={linha}
+                style={{
+                  color: linha.startsWith("Nenhum") ? cores.aviso : cores.textoFraco,
+                  fontSize: 13,
+                  lineHeight: 19,
+                  marginBottom: 6,
+                }}
+              >
+                {linha}
+              </Text>
+            ))}
+            <Legenda>
+              A lista abaixo é a da passada abrangente, que enxerga tudo que a
+              outra enxerga.
+            </Legenda>
+          </Cartao>
+        )}
 
         {cru && (
           <Cartao>
@@ -228,8 +285,12 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
                 endereço {d.tipoEndereco}
               </Text>
 
+              {/* O intervalo é a assinatura mais estável do beacon: não muda
+                  quando o endereço rotaciona, e é o que permite reconhecê-lo
+                  comparando com o que o nRF Connect mostra. */}
               <Text style={{ color: cores.textoFraco, fontSize: 13, marginTop: 4 }}>
                 {d.nome ?? d.nomeLocal ?? "(sem nome)"} · {d.anuncios} anúncio(s)
+                {d.intervaloMs !== null ? ` · a cada ~${d.intervaloMs} ms` : ""}
               </Text>
 
               {d.reconhecido ? (
@@ -245,22 +306,26 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
                 </Text>
               )}
 
-              {d.manufacturerHex && (
+              {/* Todos os payloads distintos, não só o último: um beacon que
+                  alterna entre quadros esconderia o quadro que interessa. */}
+              {d.payloads.map((payload, indice) => (
                 <Text
+                  key={payload}
                   style={{
                     color: cores.textoFraco,
                     fontFamily: "monospace",
                     fontSize: 11,
-                    marginTop: 6,
+                    marginTop: indice === 0 ? 6 : 2,
                   }}
                   selectable
                 >
-                  mfr: {d.manufacturerHex}
+                  mfr: {payload}
                 </Text>
-              )}
+              ))}
 
-              {d.serviceDataHex && (
+              {d.payloadsServico.map((payload) => (
                 <Text
+                  key={payload}
                   style={{
                     color: cores.textoFraco,
                     fontFamily: "monospace",
@@ -269,7 +334,13 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
                   }}
                   selectable
                 >
-                  svc: {d.serviceDataHex}
+                  svc: {payload}
+                </Text>
+              ))}
+
+              {d.payloads.length > 1 && (
+                <Text style={{ color: cores.info, fontSize: 11, marginTop: 4 }}>
+                  alterna entre {d.payloads.length} quadros diferentes
                 </Text>
               )}
 

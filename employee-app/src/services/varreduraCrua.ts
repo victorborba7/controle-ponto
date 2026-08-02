@@ -23,15 +23,40 @@ export type DispositivoCru = {
   rssi: number | null;
   /** Quantas vezes este dispositivo apareceu durante a varredura. */
   anuncios: number;
-  /** manufacturerData inteiro em hex — permite decodificar o anúncio à mão. */
-  manufacturerHex: string | null;
+  /**
+   * **Todos** os payloads de fabricante distintos vistos, em hex.
+   *
+   * Plural de propósito. Um mesmo aparelho pode alternar entre quadros
+   * diferentes — um beacon que transmite iBeacon e um quadro de telemetria,
+   * por exemplo. Guardar só o último faz o quadro que interessa desaparecer
+   * sem deixar rastro, que é exatamente o descarte silencioso que esta tela
+   * existe para evitar.
+   */
+  payloads: string[];
   serviceUUIDs: string[];
-  serviceDataHex: string | null;
+  /** Idem, para os payloads de serviço (é onde o Eddystone viaja). */
+  payloadsServico: string[];
   /** Se os parsers do app reconhecem este anúncio, e como. */
   reconhecido: string | null;
   /** Se o endereço rotaciona por privacidade (ver `tipoDeEndereco`). */
   tipoEndereco: string;
+  /**
+   * Intervalo médio entre anúncios, em ms.
+   *
+   * É uma assinatura útil: o intervalo de transmissão de um beacon é fixo e
+   * conhecido (o Aruba ARBT0100 sai de fábrica em ~505 ms), então bate com o
+   * que o nRF Connect mostra mesmo quando o endereço mudou.
+   */
+  intervaloMs: number | null;
 };
+
+/**
+ * Quantos payloads distintos guardar por aparelho.
+ *
+ * Aparelhos da rede Find My trocam o payload a cada anúncio; sem limite, uma
+ * varredura de 12 s acumularia centenas de linhas inúteis por aparelho.
+ */
+const MAXIMO_PAYLOADS = 6;
 
 /**
  * Palpite sobre o tipo do endereço BLE, pelos dois bits mais altos.
@@ -109,6 +134,38 @@ export type ResultadoCru = {
   parametros: string;
 };
 
+/**
+ * Parâmetros da varredura, para poder variar **um de cada vez**.
+ *
+ * Quando um app enxerga um beacon e o outro não, a diferença está em algum
+ * parâmetro de varredura. Chutar qual é custa uma reinstalação por tentativa;
+ * variar de forma controlada responde numa passada só.
+ */
+export type ParametrosVarredura = {
+  /**
+   * `true` (padrão do Android) reporta **só** anúncios legados; `false`
+   * reporta legados **e** estendidos (BLE 5).
+   *
+   * O nome engana: `false` é o mais abrangente, e é o que o nRF Connect usa.
+   * Um beacon que anuncie de forma estendida some por completo com `true`.
+   */
+  legacy: boolean;
+  scanMode: number;
+  rotulo: string;
+};
+
+export const PARAMETROS_PADRAO: ParametrosVarredura = {
+  legacy: true,
+  scanMode: ScanMode.LowLatency,
+  rotulo: "legado apenas",
+};
+
+export const PARAMETROS_ABRANGENTES: ParametrosVarredura = {
+  legacy: false,
+  scanMode: ScanMode.LowLatency,
+  rotulo: "legado + estendido",
+};
+
 /** Converte base64 em hexadecimal legível, para decodificar o anúncio à mão. */
 export function paraHex(base64: string | null | undefined, maximo = 32): string | null {
   if (!base64) return null;
@@ -157,8 +214,11 @@ export function reconhecer(
   return null;
 }
 
-export async function varrerCru(duracaoMs = 12_000): Promise<ResultadoCru> {
-  const parametros = `LowLatency · legacy · sem filtro · ${duracaoMs / 1000}s`;
+export async function varrerCru(
+  duracaoMs = 12_000,
+  opcoes: ParametrosVarredura = PARAMETROS_PADRAO,
+): Promise<ResultadoCru> {
+  const parametros = `LowLatency · ${opcoes.rotulo} · sem filtro · ${duracaoMs / 1000}s`;
 
   const permissao = await garantirPermissoesBluetooth();
   if (!permissao.concedida) {
@@ -186,10 +246,24 @@ export async function varrerCru(duracaoMs = 12_000): Promise<ResultadoCru> {
   }
 
   return new Promise((resolve) => {
-    const encontrados = new Map<string, DispositivoCru>();
+    /** Acumulador interno: o que só serve para calcular fica fora do tipo público. */
+    type Acumulado = Omit<DispositivoCru, "payloads" | "payloadsServico" | "intervaloMs"> & {
+      payloads: Set<string>;
+      payloadsServico: Set<string>;
+      primeiroEm: number;
+      ultimoEm: number;
+    };
+
+    const encontrados = new Map<string, Acumulado>();
     let anunciosRecebidos = 0;
     let erro: string | null = null;
     let finalizado = false;
+
+    /** Média entre anúncios; precisa de ao menos dois para existir. */
+    const intervalo = (d: Acumulado): number | null =>
+      d.anuncios >= 2 && d.ultimoEm > d.primeiroEm
+        ? Math.round((d.ultimoEm - d.primeiroEm) / (d.anuncios - 1))
+        : null;
 
     const finalizar = () => {
       if (finalizado) return;
@@ -200,12 +274,19 @@ export async function varrerCru(duracaoMs = 12_000): Promise<ResultadoCru> {
         // Beacons reconhecidos primeiro, e só depois por sinal. Numa varredura
         // de hangar aparecem dezenas de aparelhos, e ordenar só por RSSI
         // enterra o beacon procurado no meio de fones e televisores.
-        dispositivos: Array.from(encontrados.values()).sort((a, b) => {
-          const pesoA = a.reconhecido ? 1 : 0;
-          const pesoB = b.reconhecido ? 1 : 0;
-          if (pesoA !== pesoB) return pesoB - pesoA;
-          return (b.rssi ?? -999) - (a.rssi ?? -999);
-        }),
+        dispositivos: Array.from(encontrados.values())
+          .map((d) => ({
+            ...d,
+            payloads: Array.from(d.payloads),
+            payloadsServico: Array.from(d.payloadsServico),
+            intervaloMs: intervalo(d),
+          }))
+          .sort((a, b) => {
+            const pesoA = a.reconhecido ? 1 : 0;
+            const pesoB = b.reconhecido ? 1 : 0;
+            if (pesoA !== pesoB) return pesoB - pesoA;
+            return (b.rssi ?? -999) - (a.rssi ?? -999);
+          }),
         anunciosRecebidos,
         duracaoMs,
         erro,
@@ -217,7 +298,11 @@ export async function varrerCru(duracaoMs = 12_000): Promise<ResultadoCru> {
 
     ble.startDeviceScan(
       null,
-      { allowDuplicates: true, scanMode: ScanMode.LowLatency, legacyScan: true },
+      {
+        allowDuplicates: true,
+        scanMode: opcoes.scanMode,
+        legacyScan: opcoes.legacy,
+      },
       (falha, dispositivo) => {
         if (falha) {
           erro = falha.reason ?? falha.message ?? String(falha);
@@ -232,6 +317,19 @@ export async function varrerCru(duracaoMs = 12_000): Promise<ResultadoCru> {
         // Sem descartar por RSSI ausente: o objetivo aqui é ver TUDO.
         const anterior = encontrados.get(dispositivo.id);
         const rssiAtual = dispositivo.rssi;
+        const agora = Date.now();
+
+        // Acumula os payloads em vez de sobrescrever. Um aparelho que alterna
+        // entre quadros mostraria só o último, e o quadro de beacon sumiria.
+        const payloads = anterior?.payloads ?? new Set<string>();
+        const hexFabricante = paraHex(dispositivo.manufacturerData);
+        if (hexFabricante && payloads.size < MAXIMO_PAYLOADS) payloads.add(hexFabricante);
+
+        const payloadsServico = anterior?.payloadsServico ?? new Set<string>();
+        for (const bruto of Object.values(dispositivo.serviceData ?? {})) {
+          const hex = paraHex(bruto);
+          if (hex && payloadsServico.size < MAXIMO_PAYLOADS) payloadsServico.add(hex);
+        }
 
         encontrados.set(dispositivo.id, {
           id: dispositivo.id,
@@ -244,20 +342,93 @@ export async function varrerCru(duracaoMs = 12_000): Promise<ResultadoCru> {
               ? rssiAtual
               : (anterior?.rssi ?? null),
           anuncios: (anterior?.anuncios ?? 0) + 1,
-          manufacturerHex:
-            paraHex(dispositivo.manufacturerData) ?? anterior?.manufacturerHex ?? null,
+          payloads,
           serviceUUIDs: dispositivo.serviceUUIDs ?? anterior?.serviceUUIDs ?? [],
-          serviceDataHex:
-            paraHex(Object.values(dispositivo.serviceData ?? {})[0]) ??
-            anterior?.serviceDataHex ??
-            null,
+          payloadsServico,
           reconhecido:
             reconhecer(dispositivo.serviceData, dispositivo.manufacturerData) ??
             anterior?.reconhecido ??
             null,
           tipoEndereco: tipoDeEndereco(dispositivo.id),
+          primeiroEm: anterior?.primeiroEm ?? agora,
+          ultimoEm: agora,
         });
       },
     );
   });
+}
+
+export type ResultadoComparado = {
+  passadas: { rotulo: string; resultado: ResultadoCru }[];
+  /** Conclusões prontas, para não exigir comparar duas listas na mão. */
+  conclusoes: string[];
+};
+
+/**
+ * Varre duas vezes, variando só o parâmetro `legacy`.
+ *
+ * É a diferença conhecida entre o que este app pede ao rádio e o que o nRF
+ * Connect pede. Se um aparelho aparece só na passada abrangente, ele anuncia
+ * de forma estendida, e a correção é trocar o parâmetro — não o parser. Se
+ * aparece nas duas, ou em nenhuma, o problema está em outro lugar, e ter
+ * eliminado esta hipótese já vale a varredura.
+ */
+export async function varrerComparando(duracaoMs = 8_000): Promise<ResultadoComparado> {
+  const passadas: { rotulo: string; resultado: ResultadoCru }[] = [];
+
+  for (const parametros of [PARAMETROS_PADRAO, PARAMETROS_ABRANGENTES]) {
+    passadas.push({
+      rotulo: parametros.rotulo,
+      resultado: await varrerCru(duracaoMs, parametros),
+    });
+  }
+
+  return { passadas, conclusoes: compararPassadas(passadas) };
+}
+
+/** Traduz as duas listas em frases sobre o que fazer. Exportada para teste. */
+export function compararPassadas(
+  passadas: { rotulo: string; resultado: ResultadoCru }[],
+): string[] {
+  const [padrao, abrangente] = passadas;
+  if (!padrao || !abrangente) return [];
+
+  const erro = padrao.resultado.erro ?? abrangente.resultado.erro;
+  if (erro) return [`Varredura falhou: ${erro}`];
+
+  const conclusoes: string[] = [];
+  const idsPadrao = new Set(padrao.resultado.dispositivos.map((d) => d.id));
+
+  // Endereço rotativo faria qualquer aparelho parecer "só na 2ª passada" por
+  // acaso, então só conta o que o rádio classificaria de forma diferente.
+  const soNoAbrangente = abrangente.resultado.dispositivos.filter(
+    (d) => !idsPadrao.has(d.id),
+  );
+  const beaconsSoNoAbrangente = soNoAbrangente.filter((d) => d.reconhecido);
+
+  if (beaconsSoNoAbrangente.length > 0) {
+    conclusoes.push(
+      `${beaconsSoNoAbrangente.length} beacon(s) aparecem SÓ com anúncio ` +
+        `estendido. É a causa: o app precisa varrer com legacy=false.`,
+    );
+  }
+
+  const reconhecidos =
+    padrao.resultado.dispositivos.filter((d) => d.reconhecido).length +
+    beaconsSoNoAbrangente.length;
+
+  if (reconhecidos === 0) {
+    conclusoes.push(
+      "Nenhum beacon reconhecido em nenhuma das duas passadas — o parâmetro " +
+        "legacy não é a causa. O anúncio não está chegando ao app.",
+    );
+  }
+
+  conclusoes.push(
+    `${padrao.resultado.dispositivos.length} aparelho(s) só com legado, ` +
+      `${abrangente.resultado.dispositivos.length} com legado + estendido ` +
+      `(${soNoAbrangente.length} exclusivo(s) da 2ª passada).`,
+  );
+
+  return conclusoes;
 }
