@@ -38,6 +38,15 @@ export function BaterPonto({
   const [permissaoLocalizacao, setPermissaoLocalizacao] = useState<boolean | null>(null);
   const [etapa, setEtapa] = useState<Etapa>({ nome: "ocioso" });
   const [pendentes, setPendentes] = useState(0);
+  /**
+   * Batidas que saíram da fila sem virar registro.
+   *
+   * Acontece quando o servidor recusa em definitivo — inclusive quando a foto
+   * já não está no cache do aparelho. Sumir em silêncio é inaceitável num
+   * sistema de ponto: é um dia de trabalho que ninguém vai reclamar porque
+   * ninguém ficou sabendo.
+   */
+  const [descartadas, setDescartadas] = useState(0);
 
   // O BleManager mantém o rádio ligado enquanto existe; encerrar ao sair da
   // tela evita consumo de bateria com o app aberto e parado.
@@ -56,7 +65,10 @@ export function BaterPonto({
   // Ao abrir o app, tenta subir o que ficou represado no ponto cego de sinal.
   useEffect(() => {
     sincronizar()
-      .then(atualizarPendentes)
+      .then(async (resultado) => {
+        if (resultado.descartadas > 0) setDescartadas(resultado.descartadas);
+        await atualizarPendentes();
+      })
       .catch(() => undefined);
   }, [atualizarPendentes]);
 
@@ -251,6 +263,15 @@ export function BaterPonto({
           <Aviso tipo="aviso">
             {pendentes} {pendentes === 1 ? "registro aguardando" : "registros aguardando"}{" "}
             envio. Serão enviados assim que houver sinal.
+          </Aviso>
+        )}
+
+        {descartadas > 0 && (
+          <Aviso tipo="erro">
+            {descartadas === 1
+              ? "1 registro guardado não pôde ser enviado e saiu da fila."
+              : `${descartadas} registros guardados não puderam ser enviados e saíram da fila.`}{" "}
+            Avise o RH para lançar o horário manualmente.
           </Aviso>
         )}
 
