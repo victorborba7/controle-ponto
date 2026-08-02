@@ -230,6 +230,44 @@ diagnosticar em campo.
 
 ---
 
+## `neverForLocation`: a armadilha que custou meio dia
+
+**Sintoma:** a varredura funciona, aparecem dezenas de celulares, fones e
+televisores — e o beacon nunca aparece, embora o nRF Connect o veja a poucos
+metros. Nenhum erro, nenhuma permissão negada.
+
+**Causa:** a partir do Android 12, declarar
+
+```xml
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+                 android:usesPermissionFlags="neverForLocation" />
+```
+
+é prometer ao sistema que o app não usa Bluetooth para inferir localização. Em
+troca, ele fica dispensado de pedir permissão de localização — e o sistema
+**apaga dos resultados de varredura todo anúncio que permitiria inferir
+posição**. Ou seja: exatamente os beacons.
+
+**Por que aconteceu sem ninguém ter pedido:** o `react-native-ble-plx` declara
+essa flag no manifesto **da própria biblioteca**
+(`android/src/main/AndroidManifest.xml`). O merge de manifestos do Gradle junta
+os manifestos das bibliotecas ao do app, então a flag entra pela porta dos
+fundos. A opção `neverForLocation` do plugin (padrão `false`) só decide se o
+plugin *acrescenta* a flag — não remove a que já vem da biblioteca.
+
+**Correção:** [`employee-app/plugins/withVarreduraDeBeacon.js`](../employee-app/plugins/withVarreduraDeBeacon.js)
+marca a permissão com `tools:remove="android:usesPermissionFlags"`, o que
+instrui o merge a apagar o atributo do resultado final.
+
+**Contrapartida:** sem a flag, o Android 12+ volta a exigir
+`ACCESS_FINE_LOCATION` concedida **e** o serviço de localização ligado. É por
+isso que `permissoes.ts` pede as três permissões em toda versão.
+
+> Exige **gerar um APK novo**. É mudança de manifesto — recarregar o JS não
+> tem efeito nenhum.
+
+---
+
 ## Se o beacon não aparecer
 
 Verifique nesta ordem:
@@ -237,11 +275,13 @@ Verifique nesta ordem:
 1. **Bluetooth ligado** no celular
 2. **Permissão de localização concedida** — no Android, é ela que libera o BLE.
    Sem ela a varredura retorna vazia sem dar erro
-3. **O beacon está transmitindo** — confirme no nRF Connect. Bateria nova? A
+3. **O APK é posterior à correção do `neverForLocation`** (seção acima). Este é
+   o caso em que a varredura acha tudo, menos beacons
+4. **O beacon está transmitindo** — confirme no nRF Connect. Bateria nova? A
    lingueta plástica foi removida?
-4. **O formato é UID ou iBeacon** — Eddystone-**URL** e Eddystone-**TLM** são
+5. **O formato é UID ou iBeacon** — Eddystone-**URL** e Eddystone-**TLM** são
    descartados de propósito: não carregam identificador de local
-5. **O identificador cadastrado é o mesmo** que o beacon transmite
+6. **O identificador cadastrado é o mesmo** que o beacon transmite
 
 Para o Aruba, se ele não transmitir nada reconhecível, será preciso configurá-lo
 pelo app **Aruba Beacons** — e aí a conta Meridian entra na conta.

@@ -76,7 +76,8 @@
             "minSdkVersion": 24
           }
         }
-      ]
+      ],
+      "./plugins/withVarreduraDeBeacon"
     ],
     "extra": {
       "eas": {
