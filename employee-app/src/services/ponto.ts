@@ -2,6 +2,8 @@
  * Envio da batida ao servidor, com fila e reenvio.
  */
 
+import { File } from "expo-file-system";
+
 import { ApiError, enviarMultipart } from "./api";
 import {
   type BatidaPendente,
@@ -60,16 +62,31 @@ export function ehFalhaDeRede(erro: unknown): boolean {
   );
 }
 
-function montarFormulario(batida: BatidaPendente): FormData {
+/**
+ * Monta o multipart da batida.
+ *
+ * A selfie vai como `File` do `expo-file-system`, e **não** como o objeto
+ * `{ uri, name, type }` que o React Native aceita. A partir do SDK 54 o Expo
+ * substitui o `fetch` global pela implementação dele, que não entende esse
+ * formato — ela aceita texto, `Blob`, ou objeto com `bytes()`, e recusa o
+ * resto com "Unsupported FormDataPart implementation".
+ *
+ * O `File` serve porque implementa `Blob`: expõe `bytes()`, e também `name` e
+ * `type`, que viram o `filename` e o content-type da parte. O `filename` não é
+ * detalhe — é ele que faz o FastAPI tratar a parte como arquivo em vez de
+ * campo de texto.
+ */
+async function montarFormulario(batida: BatidaPendente): Promise<FormData> {
   const dados = new FormData();
 
-  // O React Native aceita este formato de arquivo em FormData; o TypeScript do
-  // DOM não o conhece, daí o cast.
-  dados.append("selfie", {
-    uri: batida.fotoUri,
-    name: "selfie.jpg",
-    type: "image/jpeg",
-  } as unknown as Blob);
+  const arquivo = new File(batida.fotoUri);
+  if (!arquivo.exists) {
+    // Acontece com batida represada: a foto fica no cache, e o Android pode
+    // limpá-lo. Falhar aqui com o motivo certo evita reenviar para sempre uma
+    // batida que nunca vai completar.
+    throw new ApiError("A foto desta batida não está mais no aparelho.", 422);
+  }
+  dados.append("selfie", arquivo as unknown as Blob);
 
   dados.append("evidence", JSON.stringify(batida.sinais));
   dados.append("idempotency_key", batida.idempotencyKey);
@@ -103,7 +120,7 @@ export async function baterPonto(
   try {
     const resposta = await enviarMultipart<RespostaPonto>(
       "/time-entries",
-      montarFormulario(batida),
+      await montarFormulario(batida),
     );
     return { situacao: "enviado", resposta };
   } catch (erro) {
@@ -151,7 +168,10 @@ export async function sincronizar(): Promise<ResultadoSincronizacao> {
 
   for (const batida of fila) {
     try {
-      await enviarMultipart<RespostaPonto>("/time-entries", montarFormulario(batida));
+      await enviarMultipart<RespostaPonto>(
+        "/time-entries",
+        await montarFormulario(batida),
+      );
       await remover(batida.idempotencyKey);
       enviadas += 1;
     } catch (erro) {

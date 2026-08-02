@@ -60,6 +60,27 @@ EXPO_PUBLIC_API_URL=http://192.168.3.27:8000
 > máquina**, então tudo funciona. Abrindo o app sozinho, ele usa o bundle
 > embutido, sem a variável — e as batidas caem na fila local sem nunca subir.
 
+> ### Arquivo em `FormData`: o formato do React Native não vale mais
+>
+> A receita clássica de enviar arquivo no React Native —
+>
+> ```ts
+> form.append("selfie", { uri, name: "selfie.jpg", type: "image/jpeg" });
+> ```
+>
+> — **falha no Expo SDK 54+**, com `Unsupported FormDataPart implementation`.
+> O Expo substitui o `fetch` global pela implementação dele, que aceita só
+> texto, `Blob`, ou objeto com `bytes()`.
+>
+> O caminho que funciona é o `File` do `expo-file-system`, que implementa
+> `Blob` e ainda traz `name` e `type` — e o `name` importa: é o `filename` da
+> parte que faz o FastAPI tratá-la como arquivo, e não como campo de texto.
+>
+> ```ts
+> import { File } from "expo-file-system";
+> form.append("selfie", new File(uri) as unknown as Blob);
+> ```
+
 O backend precisa aceitar conexões de fora do container:
 
 ```bash
