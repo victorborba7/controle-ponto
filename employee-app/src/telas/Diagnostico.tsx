@@ -1,5 +1,5 @@
 import * as Clipboard from "expo-clipboard";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
 import {
@@ -8,7 +8,11 @@ import {
   type DispositivoVisto,
   type SinaisColetados,
 } from "../services/localizacao";
-import { varrerCru, type ResultadoCru } from "../services/varreduraCrua";
+import {
+  detectarRotacao,
+  varrerCru,
+  type ResultadoCru,
+} from "../services/varreduraCrua";
 import { Aviso, Botao, Cartao, Legenda, Titulo, cores } from "../ui";
 
 /**
@@ -31,6 +35,15 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
   const [copiado, setCopiado] = useState<string | null>(null);
   const [cru, setCru] = useState<ResultadoCru | null>(null);
   const [varrendoCru, setVarrendoCru] = useState(false);
+  const [rotacao, setRotacao] = useState<string[]>([]);
+
+  /**
+   * Endereços já vistos para cada identidade de beacon, entre varreduras.
+   *
+   * Fica em `ref` para sobreviver às re-renderizações sem provocá-las: é
+   * memória de diagnóstico, não estado de tela.
+   */
+  const historicoEnderecos = useRef(new Map<string, Set<string>>());
 
   /**
    * Varredura sem filtro nem interpretação, por mais tempo.
@@ -43,7 +56,14 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
     setVarrendoCru(true);
     setCru(null);
     try {
-      setCru(await varrerCru(12_000));
+      const resultado = await varrerCru(12_000);
+      setCru(resultado);
+      // Comparando com as varreduras anteriores: se a mesma identidade de
+      // beacon apareceu sob outro endereço, ele rotaciona — e aí cadastrar
+      // por MAC não funciona.
+      setRotacao(
+        detectarRotacao(historicoEnderecos.current, resultado.dispositivos),
+      );
     } finally {
       setVarrendoCru(false);
     }
@@ -111,8 +131,18 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
                 Erro: {cru.erro}
               </Text>
             )}
+            <Text style={{ color: cores.textoFraco, fontSize: 12, marginTop: 8 }}>
+              Varra duas vezes com alguns minutos de intervalo: se um beacon
+              reaparecer sob outro endereço, ele rotaciona o MAC.
+            </Text>
           </Cartao>
         )}
+
+        {rotacao.map((aviso) => (
+          <Aviso key={aviso} tipo="aviso">
+            {aviso}
+          </Aviso>
+        ))}
 
         {cru?.dispositivos.map((d) => (
           <Pressable key={d.id} onPress={() => copiar(d.id, `cru-${d.id}`)}>
@@ -135,20 +165,67 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
                 </Text>
               </View>
 
+              {/* Endereço que rotaciona torna o cadastro por MAC inviável —
+                  destacado porque é a diferença entre "sumiu" e "mudou". */}
+              <Text
+                style={{
+                  color: d.tipoEndereco.includes("rotaciona")
+                    ? cores.aviso
+                    : cores.textoFraco,
+                  fontSize: 12,
+                  marginTop: 2,
+                }}
+              >
+                endereço {d.tipoEndereco}
+              </Text>
+
               <Text style={{ color: cores.textoFraco, fontSize: 13, marginTop: 4 }}>
                 {d.nome ?? d.nomeLocal ?? "(sem nome)"} · {d.anuncios} anúncio(s)
               </Text>
 
-              <Text style={{ color: cores.textoFraco, fontSize: 12, marginTop: 4 }}>
-                {d.temManufacturerData
-                  ? `fabricante: ${d.fabricante}`
-                  : "sem manufacturerData"}
-                {d.temServiceData ? " · com serviceData" : ""}
-                {d.serviceUUIDs.length ? ` · ${d.serviceUUIDs.length} serviço(s)` : ""}
-              </Text>
+              {d.reconhecido ? (
+                <Text
+                  style={{ color: cores.acento, fontSize: 12, marginTop: 6 }}
+                  selectable
+                >
+                  ✓ {d.reconhecido}
+                </Text>
+              ) : (
+                <Text style={{ color: cores.textoFraco, fontSize: 12, marginTop: 6 }}>
+                  não reconhecido como beacon
+                </Text>
+              )}
+
+              {d.manufacturerHex && (
+                <Text
+                  style={{
+                    color: cores.textoFraco,
+                    fontFamily: "monospace",
+                    fontSize: 11,
+                    marginTop: 6,
+                  }}
+                  selectable
+                >
+                  mfr: {d.manufacturerHex}
+                </Text>
+              )}
+
+              {d.serviceDataHex && (
+                <Text
+                  style={{
+                    color: cores.textoFraco,
+                    fontFamily: "monospace",
+                    fontSize: 11,
+                    marginTop: 2,
+                  }}
+                  selectable
+                >
+                  svc: {d.serviceDataHex}
+                </Text>
+              )}
 
               <Text style={{ color: cores.textoFraco, fontSize: 12, marginTop: 6 }}>
-                {copiado === `cru-${d.id}` ? "Copiado!" : "Toque para copiar"}
+                {copiado === `cru-${d.id}` ? "Copiado!" : "Toque para copiar o MAC"}
               </Text>
             </Cartao>
           </Pressable>
