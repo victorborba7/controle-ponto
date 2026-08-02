@@ -48,12 +48,32 @@ Se conseguir acesso ao app da Aruba, **prefira configurar Major/Minor** — sai
 mais barato que refazer isso quando o iPhone entrar. Se não conseguir, o MAC
 resolve o Android agora.
 
-### Antes de comprar o resto dos beacons
+### O MAC do ARBT0100 não rotaciona (verificado)
 
-Confirme que **o MAC não rotaciona**: leia agora, aguarde 30 minutos e leia de
-novo. Alguns beacons giram o endereço por privacidade — se este girar,
-identificação por MAC não se sustenta e a configuração via Aruba Beacons passa
-a ser obrigatória.
+`7c:ec:79:44:c5:b5` foi lido pelo nRF Connect em 31/07 e pelo app em 02/08 —
+mesmo endereço, dois dias depois. Identificação por MAC se sustenta nesta
+unidade.
+
+Vale conferir por unidade antes de fechar a instalação: leia, aguarde 30
+minutos e leia de novo. A tela de diagnóstico avisa sozinha se o mesmo beacon
+reaparecer sob outro endereço.
+
+> O bit mais alto do endereço (`0x7C` → padrão `01`) **sugere** endereço
+> privado, que rotacionaria. Sugere e erra: o palpite pelos bits só vale para
+> endereços aleatórios, e um endereço público pode ter qualquer valor. Medir
+> resolveu o que deduzir não resolveria.
+
+### O beacon anuncia iBeacon e MAC ao mesmo tempo
+
+O app relata as duas identidades para o mesmo aparelho, com o mesmo RSSI:
+
+```json
+{ "protocol": "ibeacon", "ibeacon_uuid": "4152554e-…", "major": 0, "minor": 0, "rssi": -47 }
+{ "protocol": "mac",     "mac_address": "7c:ec:79:44:c5:b5",              "rssi": -47 }
+```
+
+São o mesmo beacon visto de dois jeitos, não dois beacons. Cadastre por **um**
+dos dois — o que estiver cadastrado é o que valida.
 
 ---
 
