@@ -8,6 +8,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.messages import Msg, traduzir
 from tests.conftest import (
     auth_header,
     bater_ponto,
@@ -204,7 +205,7 @@ async def test_rotulo_obrigatorio_ausente_barra_a_batida(client: AsyncClient, co
     resposta = await bater_ponto(client, com_lista)
 
     assert resposta.status_code == 422, resposta.text
-    assert "tipo da batida" in resposta.json()["detail"]
+    assert resposta.json()["detail"] == traduzir(Msg.TIPO_OBRIGATORIO)
 
 
 async def test_rotulo_casa_sem_diferenciar_maiusculas(client: AsyncClient, com_lista: dict):

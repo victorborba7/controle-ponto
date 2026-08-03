@@ -8,6 +8,7 @@ import uuid
 
 import pytest
 
+from app.core.messages import Msg
 from app.facial.base import MatchOutcome
 from app.models.enums import LocationMethod, TimeEntryStatus
 from app.services.location_validator import LocationVerdict
@@ -42,13 +43,11 @@ def sem_local() -> LocationVerdict:
 
 
 def test_rosto_certo_e_local_confirmado_aprova():
-    decisao = decide(
-        face_outcome=MatchOutcome.MATCH, face_score=0.88, location=local_confirmado()
-    )
+    decisao = decide(face_outcome=MatchOutcome.MATCH, face_score=0.88, location=local_confirmado())
 
     assert decisao.status is TimeEntryStatus.APPROVED
     assert decisao.accepted
-    assert decisao.message == "Ponto registrado."
+    assert decisao.chave is Msg.PONTO_REGISTRADO
 
 
 # --------------------------------------------------------------------------
@@ -83,7 +82,7 @@ def test_mensagem_da_recusa_orienta_o_funcionario():
     decisao = decide(
         face_outcome=MatchOutcome.NO_MATCH, face_score=0.1, location=local_confirmado()
     )
-    assert "iluminacao" in decisao.message
+    assert decisao.chave is Msg.ROSTO_NAO_RECONHECIDO
 
 
 # --------------------------------------------------------------------------
@@ -93,9 +92,7 @@ def test_mensagem_da_recusa_orienta_o_funcionario():
 
 def test_rosto_no_limite_vai_para_revisao():
     """Barrar quem esta no lugar certo por causa da luz e pior que revisar."""
-    decisao = decide(
-        face_outcome=MatchOutcome.REVIEW, face_score=0.36, location=local_confirmado()
-    )
+    decisao = decide(face_outcome=MatchOutcome.REVIEW, face_score=0.36, location=local_confirmado())
 
     assert decisao.status is TimeEntryStatus.PENDING_REVIEW
     assert decisao.accepted
@@ -103,9 +100,7 @@ def test_rosto_no_limite_vai_para_revisao():
 
 
 def test_sem_localizacao_vai_para_revisao():
-    decisao = decide(
-        face_outcome=MatchOutcome.MATCH, face_score=0.9, location=sem_local()
-    )
+    decisao = decide(face_outcome=MatchOutcome.MATCH, face_score=0.9, location=sem_local())
 
     assert decisao.status is TimeEntryStatus.PENDING_REVIEW
     assert "nao reportou nenhum sinal" in decisao.reason
@@ -127,9 +122,7 @@ def test_incoerencia_entre_sinais_vai_para_revisao():
 
 def test_pendencias_se_acumulam_na_justificativa():
     """O RH precisa ver tudo que pesou, nao so o primeiro problema."""
-    decisao = decide(
-        face_outcome=MatchOutcome.REVIEW, face_score=0.35, location=sem_local()
-    )
+    decisao = decide(face_outcome=MatchOutcome.REVIEW, face_score=0.35, location=sem_local())
 
     assert "limite" in decisao.reason
     assert "nenhum sinal" in decisao.reason
@@ -185,9 +178,7 @@ def test_relogio_adiantado_e_descrito_diferente():
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "metodo", [LocationMethod.BEACON, LocationMethod.WIFI, LocationMethod.GPS]
-)
+@pytest.mark.parametrize("metodo", [LocationMethod.BEACON, LocationMethod.WIFI, LocationMethod.GPS])
 def test_qualquer_metodo_confirmado_aprova(metodo: LocationMethod):
     """GPS prova menos que beacon, mas confirmado e confirmado.
 

@@ -15,6 +15,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.messages import Msg, traduzir
 from app.models import AuditLog, TimeEntry
 from app.models.enums import EntryType, LocationMethod, TimeEntryStatus
 from tests.conftest import (
@@ -51,7 +52,7 @@ async def test_ponto_por_beacon(client: AsyncClient, cenario: dict):
     assert entry["status"] == "approved"
     assert entry["beacon_rssi"] == -55
     assert entry["location_confidence"] >= 0.75
-    assert response.json()["message"] == "Ponto registrado."
+    assert response.json()["message"] == traduzir(Msg.PONTO_REGISTRADO)
 
 
 async def test_ponto_por_wifi(client: AsyncClient, cenario: dict):
@@ -80,7 +81,7 @@ async def test_ponto_sem_sinal_nenhum_vai_para_revisao(client: AsyncClient, cena
     entry = response.json()["entry"]
     assert entry["location_method"] == "none"
     assert entry["status"] == "pending_review"
-    assert "conferencia" in response.json()["message"]
+    assert response.json()["message"] == traduzir(Msg.PONTO_EM_CONFERENCIA)
 
 
 # --------------------------------------------------------------------------
@@ -94,7 +95,7 @@ async def test_rosto_de_outra_pessoa_nao_registra_ponto(
     response = await bater_ponto(client, cenario, cor=OUTRA_PESSOA)
 
     assert response.status_code == 422
-    assert "Nao reconhecemos seu rosto" in response.json()["detail"]
+    assert response.json()["detail"] == traduzir(Msg.ROSTO_NAO_RECONHECIDO)
     assert (await db.execute(select(TimeEntry))).scalars().all() == []
 
 
@@ -153,19 +154,17 @@ async def test_funcionario_sem_cadastro_biometrico(
         },
     )
 
-    response = await bater_ponto(
-        client, cenario, headers=auth_header(login.json()["tokens"])
-    )
+    response = await bater_ponto(client, cenario, headers=auth_header(login.json()["tokens"]))
 
     assert response.status_code == 412
-    assert "Procure o RH" in response.json()["detail"]
+    assert response.json()["detail"] == traduzir(Msg.ROSTO_NAO_CADASTRADO)
 
 
 async def test_foto_sem_rosto_e_recusada(client: AsyncClient, cenario: dict):
     response = await bater_ponto(client, cenario, cor=(0, 0, 0))
 
     assert response.status_code == 422
-    assert "rosto" in response.json()["detail"].lower()
+    assert response.json()["detail"] == traduzir(Msg.NENHUM_ROSTO)
 
 
 # --------------------------------------------------------------------------
@@ -186,19 +185,17 @@ async def test_reenvio_com_a_mesma_chave_nao_duplica(
     assert segunda.status_code == 201
     assert primeira.json()["entry"]["id"] == segunda.json()["entry"]["id"]
     assert segunda.json()["duplicate"] is True
-    assert "ja havia sido registrado" in segunda.json()["message"]
+    assert segunda.json()["message"] == traduzir(Msg.PONTO_JA_REGISTRADO)
 
     assert len((await db.execute(select(TimeEntry))).scalars().all()) == 1
 
 
-async def test_duas_batidas_coladas_sao_o_mesmo_toque(
-    client: AsyncClient, cenario: dict
-):
+async def test_duas_batidas_coladas_sao_o_mesmo_toque(client: AsyncClient, cenario: dict):
     await bater_ponto(client, cenario)
     segunda = await bater_ponto(client, cenario)
 
     assert segunda.status_code == 409
-    assert "acabou de bater" in segunda.json()["detail"]
+    assert segunda.json()["detail"] == traduzir(Msg.BATIDA_REPETIDA)
 
 
 async def test_batida_apos_o_intervalo_minimo_e_aceita(
@@ -253,16 +250,14 @@ async def test_aparelho_revogado_nao_bate_ponto(
 ):
     from app.models import Device
 
-    device = await db.scalar(
-        select(Device).where(Device.id == uuid.UUID(cenario["device_id"]))
-    )
+    device = await db.scalar(select(Device).where(Device.id == uuid.UUID(cenario["device_id"])))
     device.revoked_at = datetime.now(UTC)
     await db.commit()
 
     response = await bater_ponto(client, cenario)
 
     assert response.status_code == 403
-    assert "desvinculado" in response.json()["detail"]
+    assert response.json()["detail"] == traduzir(Msg.APARELHO_DESVINCULADO)
 
 
 async def test_admin_nao_bate_ponto_por_ninguem(client: AsyncClient, cenario: dict):
@@ -350,9 +345,7 @@ async def test_beacon_fraco_cai_para_gps(client: AsyncClient, cenario: dict):
     assert response.json()["entry"]["location_method"] == "gps"
 
 
-async def test_incoerencia_entre_beacon_e_gps_vai_para_revisao(
-    client: AsyncClient, cenario: dict
-):
+async def test_incoerencia_entre_beacon_e_gps_vai_para_revisao(client: AsyncClient, cenario: dict):
     """Beacon do hangar visto de outra cidade."""
     evidencia = json.dumps(
         {
@@ -411,9 +404,7 @@ async def test_filtro_por_metodo_de_localizacao(
     por_beacon = await client.get(
         "/api/v1/time-entries?location_method=beacon", headers=cenario["admin"]
     )
-    por_gps = await client.get(
-        "/api/v1/time-entries?location_method=gps", headers=cenario["admin"]
-    )
+    por_gps = await client.get("/api/v1/time-entries?location_method=gps", headers=cenario["admin"])
 
     assert por_beacon.json()["total"] == 1
     assert por_gps.json()["total"] == 1
@@ -512,9 +503,7 @@ async def test_nao_revisa_o_que_ja_foi_decidido(client: AsyncClient, cenario: di
     assert revisao.status_code == 409
 
 
-async def test_revisao_registra_quem_decidiu(
-    client: AsyncClient, db: AsyncSession, cenario: dict
-):
+async def test_revisao_registra_quem_decidiu(client: AsyncClient, db: AsyncSession, cenario: dict):
     """Aprovacao sem autor nao serve de defesa em discussao trabalhista."""
     pendente = await bater_ponto(client, cenario, evidence=SEM_SINAL)
     entry_id = pendente.json()["entry"]["id"]
@@ -540,9 +529,7 @@ async def test_painel_busca_a_foto_do_registro(client: AsyncClient, cenario: dic
     ponto = await bater_ponto(client, cenario)
     entry_id = ponto.json()["entry"]["id"]
 
-    foto = await client.get(
-        f"/api/v1/time-entries/{entry_id}/selfie", headers=cenario["admin"]
-    )
+    foto = await client.get(f"/api/v1/time-entries/{entry_id}/selfie", headers=cenario["admin"])
 
     assert foto.status_code == 200
     assert foto.headers["content-type"].startswith("image/")
@@ -572,9 +559,7 @@ async def test_funcionario_nao_busca_foto_de_ponto(client: AsyncClient, cenario:
     ponto = await bater_ponto(client, cenario)
     entry_id = ponto.json()["entry"]["id"]
 
-    foto = await client.get(
-        f"/api/v1/time-entries/{entry_id}/selfie", headers=cenario["app"]
-    )
+    foto = await client.get(f"/api/v1/time-entries/{entry_id}/selfie", headers=cenario["app"])
     assert foto.status_code == 403
 
 
@@ -639,9 +624,7 @@ async def test_exportacao_csv(client: AsyncClient, db: AsyncSession, cenario: di
 
     await bater_ponto(client, cenario, evidence=com_gps())
 
-    csv_resposta = await client.get(
-        "/api/v1/time-entries/export/csv", headers=cenario["admin"]
-    )
+    csv_resposta = await client.get("/api/v1/time-entries/export/csv", headers=cenario["admin"])
 
     assert csv_resposta.status_code == 200
     assert "attachment" in csv_resposta.headers["content-disposition"]
@@ -663,18 +646,14 @@ async def test_csv_usa_o_formato_que_o_excel_em_portugues_espera(
     """Ponto decimal e virgula separadora fariam a planilha abrir numa coluna so."""
     await bater_ponto(client, cenario)
 
-    texto = (
-        await client.get("/api/v1/time-entries/export/csv", headers=cenario["admin"])
-    ).text
+    texto = (await client.get("/api/v1/time-entries/export/csv", headers=cenario["admin"])).text
     linha_de_dados = [linha for linha in texto.splitlines() if "Joao" in linha][0]
 
     assert ";" in linha_de_dados
     assert "0,95" in linha_de_dados  # confianca do beacon, com virgula decimal
 
 
-async def test_csv_respeita_os_filtros(
-    client: AsyncClient, db: AsyncSession, cenario: dict
-):
+async def test_csv_respeita_os_filtros(client: AsyncClient, db: AsyncSession, cenario: dict):
     await bater_ponto(client, cenario, evidence=com_beacon())
 
     entry = await db.scalar(select(TimeEntry))
@@ -693,9 +672,7 @@ async def test_csv_respeita_os_filtros(
     assert "Em revisao" in apenas_pendentes.text
 
 
-async def test_csv_nao_mistura_empresas(
-    client: AsyncClient, db: AsyncSession, cenario: dict
-):
+async def test_csv_nao_mistura_empresas(client: AsyncClient, db: AsyncSession, cenario: dict):
     await bater_ponto(client, cenario)
 
     outra = await create_tenant(db, slug="vizinha4")
@@ -734,9 +711,7 @@ async def test_ponto_de_outra_empresa_responde_404(
     assert response.status_code == 404
 
 
-async def test_listagem_nao_mistura_empresas(
-    client: AsyncClient, db: AsyncSession, cenario: dict
-):
+async def test_listagem_nao_mistura_empresas(client: AsyncClient, db: AsyncSession, cenario: dict):
     await bater_ponto(client, cenario)
 
     outra = await create_tenant(db, slug="vizinha2")
@@ -744,9 +719,7 @@ async def test_listagem_nao_mistura_empresas(
     await db.commit()
 
     login = await login_admin(client, outra, "rh@vizinha2.com")
-    listagem = await client.get(
-        "/api/v1/time-entries", headers=auth_header(login["tokens"])
-    )
+    listagem = await client.get("/api/v1/time-entries", headers=auth_header(login["tokens"]))
 
     assert listagem.json()["total"] == 0
 
@@ -756,9 +729,7 @@ async def test_listagem_nao_mistura_empresas(
 # --------------------------------------------------------------------------
 
 
-async def test_cada_batida_gera_trilha(
-    client: AsyncClient, db: AsyncSession, cenario: dict
-):
+async def test_cada_batida_gera_trilha(client: AsyncClient, db: AsyncSession, cenario: dict):
     await bater_ponto(client, cenario)
 
     registros = (await db.execute(select(AuditLog))).scalars().all()

@@ -18,6 +18,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.messages import IDIOMA_PADRAO, Msg, traduzir
 from app.db.repository import TenantRepository
 from app.facial import FacialError, MatchCandidate, MatchOutcome
 from app.facial.imaging import inspect_image
@@ -39,32 +40,55 @@ SELFIE_STORAGE_PREFIX = "selfies"
 
 
 class TimeEntryError(Exception):
-    """Falha que impede o registro do ponto."""
+    """Falha que impede o registro do ponto.
 
-    def __init__(self, message: str, *, user_message: str | None = None) -> None:
-        super().__init__(message)
-        self.user_message = user_message or message
+    Carrega a chave da mensagem, nao o texto: o servico roda sem saber o
+    idioma do aparelho que enviou a batida. A borda HTTP resolve. Ver
+    `app.core.messages`.
+    """
+
+    chave: Msg = Msg.IMAGEM_ILEGIVEL
+
+    def __init__(self, chave: Msg | None = None, /, **parametros: object) -> None:
+        if chave is not None:
+            self.chave = chave
+        self.parametros = parametros
+        super().__init__(traduzir(self.chave, IDIOMA_PADRAO, **parametros))
 
 
 class DeviceNotTrustedError(TimeEntryError):
-    pass
+    chave = Msg.FACA_LOGIN_DE_NOVO
 
 
 class NoFaceTemplatesError(TimeEntryError):
-    pass
+    chave = Msg.ROSTO_NAO_CADASTRADO
 
 
 class FaceRejectedError(TimeEntryError):
     """Rosto claramente diferente do cadastro."""
 
-    def __init__(self, message: str, *, user_message: str, score: float | None) -> None:
-        super().__init__(message, user_message=user_message)
+    chave = Msg.ROSTO_NAO_RECONHECIDO
+
+    def __init__(self, *, score: float | None, **parametros: object) -> None:
+        super().__init__(**parametros)
         self.score = score
 
 
+class StaleTemplateError(TimeEntryError):
+    """Ha template, mas de um modelo que nao esta mais em uso."""
+
+    chave = Msg.CADASTRO_FACIAL_DESATUALIZADO
+
+
+class DeviceUnlinkedError(TimeEntryError):
+    chave = Msg.APARELHO_DESVINCULADO
+
+
 class TooSoonError(TimeEntryError):
-    def __init__(self, message: str, *, existing: TimeEntry) -> None:
-        super().__init__(message)
+    chave = Msg.BATIDA_REPETIDA
+
+    def __init__(self, *, existing: TimeEntry, **parametros: object) -> None:
+        super().__init__(**parametros)
         self.existing = existing
 
 
@@ -105,7 +129,7 @@ async def punch(
                 decision=EntryDecision(
                     status=anterior.status,
                     reason=anterior.decision_reason or "",
-                    message="Este ponto ja havia sido registrado.",
+                    chave=Msg.PONTO_JA_REGISTRADO,
                 ),
                 duplicate=True,
             )
@@ -128,10 +152,7 @@ async def punch(
     # --- Rosto ---
     templates = await enrollment_service.load_active_templates(session, employee)
     if not templates:
-        raise NoFaceTemplatesError(
-            f"Funcionario {employee.external_code} nao tem cadastro biometrico",
-            user_message="Seu rosto ainda nao foi cadastrado. Procure o RH.",
-        )
+        raise NoFaceTemplatesError()
 
     face_score, face_outcome, template_id = await _match_face(engine, selfie, templates)
 
@@ -141,13 +162,7 @@ async def punch(
         # um terceiro que nunca consentiu seria criar o problema que a LGPD
         # existe para evitar. A tentativa fica na trilha de auditoria, que e
         # onde a investigacao de seguranca precisa dela.
-        raise FaceRejectedError(
-            f"Rosto nao corresponde ao cadastro de {employee.external_code} "
-            f"(score {face_score:.3f})",
-            user_message="Nao reconhecemos seu rosto. "
-            "Tente novamente com melhor iluminacao.",
-            score=face_score,
-        )
+        raise FaceRejectedError(score=face_score)
 
     # --- Localizacao ---
     registry = await load_registry(repo)
@@ -216,20 +231,11 @@ def _ensure_device_trusted(employee: Employee, device: Device | None) -> None:
     tambem pelo reconhecimento facial no aparelho certo.
     """
     if device is None:
-        raise DeviceNotTrustedError(
-            "Ponto sem aparelho identificado",
-            user_message="Faca login novamente no aplicativo.",
-        )
+        raise DeviceNotTrustedError()
     if device.revoked_at is not None:
-        raise DeviceNotTrustedError(
-            f"Aparelho {device.id} revogado",
-            user_message="Este aparelho foi desvinculado. Procure o RH.",
-        )
+        raise DeviceUnlinkedError()
     if device.employee_id != employee.id:
-        raise DeviceNotTrustedError(
-            "Aparelho vinculado a outro funcionario",
-            user_message="Faca login novamente no aplicativo.",
-        )
+        raise DeviceNotTrustedError()
 
 
 def _ensure_not_too_soon(ultimo: TimeEntry | None, now: datetime) -> None:
@@ -239,11 +245,7 @@ def _ensure_not_too_soon(ultimo: TimeEntry | None, now: datetime) -> None:
 
     intervalo = (now - ultimo.recorded_at).total_seconds()
     if intervalo < settings.time_entry_min_interval_seconds:
-        raise TooSoonError(
-            f"Ultima batida ha {intervalo:.0f}s, abaixo do minimo de "
-            f"{settings.time_entry_min_interval_seconds}s",
-            existing=ultimo,
-        )
+        raise TooSoonError(existing=ultimo)
 
 
 def _deduce_entry_type(ultimo: TimeEntry | None) -> EntryType:
@@ -271,17 +273,13 @@ async def _last_entry(repo: TenantRepository, employee: Employee) -> TimeEntry |
     return result.scalar_one_or_none()
 
 
-async def _find_by_idempotency_key(
-    repo: TenantRepository, key: str
-) -> TimeEntry | None:
+async def _find_by_idempotency_key(repo: TenantRepository, key: str) -> TimeEntry | None:
     return await repo.session.scalar(
         repo.query(TimeEntry).where(TimeEntry.idempotency_key == key).limit(1)
     )
 
 
-async def _match_face(
-    engine: AsyncFaceEngine, selfie: bytes, templates: list[FaceTemplate]
-):
+async def _match_face(engine: AsyncFaceEngine, selfie: bytes, templates: list[FaceTemplate]):
     """Compara 1:1 contra os templates ativos do proprio funcionario.
 
     1:1 e nao 1:N (decisao D3): o funcionario ja esta autenticado, entao
@@ -291,10 +289,7 @@ async def _match_face(
     try:
         embedding = await engine.extract_embedding(selfie)
     except FacialError as exc:
-        raise TimeEntryError(
-            f"Falha ao processar a selfie: {exc}",
-            user_message=exc.user_message,
-        ) from exc
+        raise TimeEntryError(exc.chave) from exc
 
     # Embeddings de modelos diferentes vivem em espacos vetoriais diferentes:
     # comparar um contra o outro nao da erro (a dimensao coincide), da um score
@@ -309,11 +304,7 @@ async def _match_face(
     ]
 
     if not compativeis:
-        raise NoFaceTemplatesError(
-            f"Funcionario tem {len(templates)} template(s), mas nenhum do modelo "
-            f"em uso ({embedding.model_name}/{embedding.model_version})",
-            user_message="Seu cadastro facial precisa ser refeito. Procure o RH.",
-        )
+        raise StaleTemplateError()
 
     candidatos = [
         MatchCandidate(template_id=template.id, vector=template.embedding)

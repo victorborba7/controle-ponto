@@ -128,9 +128,7 @@ async def test_mesma_matricula_em_empresas_diferentes_e_permitida(
     assert na_outra.status_code == 201
 
 
-async def test_senha_inicial_habilita_o_login_no_app(
-    client: AsyncClient, sessao: dict
-):
+async def test_senha_inicial_habilita_o_login_no_app(client: AsyncClient, sessao: dict):
     criado = await client.post(
         "/api/v1/employees",
         headers=sessao,
@@ -226,9 +224,7 @@ async def test_desativar_nao_apaga(
     funcionario = await create_employee(db, empresa["tenant"], external_code="C1")
     await db.commit()
 
-    response = await client.post(
-        f"/api/v1/employees/{funcionario.id}/deactivate", headers=sessao
-    )
+    response = await client.post(f"/api/v1/employees/{funcionario.id}/deactivate", headers=sessao)
 
     assert response.json()["status"] == "inactive"
     assert await db.scalar(select(Employee).where(Employee.id == funcionario.id)) is not None
@@ -256,9 +252,7 @@ async def test_funcionario_desativado_perde_o_acesso(
     assert login.status_code == 401
 
 
-async def test_redefinir_senha(
-    client: AsyncClient, db: AsyncSession, sessao: dict, empresa: dict
-):
+async def test_redefinir_senha(client: AsyncClient, db: AsyncSession, sessao: dict, empresa: dict):
     funcionario = await create_employee(db, empresa["tenant"], external_code="D1")
     await db.commit()
 
@@ -286,9 +280,7 @@ async def test_redefinir_senha(
 # --------------------------------------------------------------------------
 
 
-async def test_perfil_de_leitura_nao_cadastra(
-    client: AsyncClient, db: AsyncSession, empresa: dict
-):
+async def test_perfil_de_leitura_nao_cadastra(client: AsyncClient, db: AsyncSession, empresa: dict):
     await create_admin(db, empresa["tenant"], email="leitor@acme.com", role=UserRole.VIEWER)
     await db.commit()
 
@@ -330,9 +322,7 @@ async def test_funcionario_nao_acessa_o_cadastro(
         },
     )
 
-    resposta = await client.get(
-        "/api/v1/employees", headers=auth_header(login.json()["tokens"])
-    )
+    resposta = await client.get("/api/v1/employees", headers=auth_header(login.json()["tokens"]))
     assert resposta.status_code == 403
 
 

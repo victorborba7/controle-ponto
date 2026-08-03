@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.messages import IDIOMA_PADRAO, Msg, traduzir
 from app.db.repository import TenantRepository
 from app.models import PunchConfig, PunchLabel
 from app.models.enums import EntryType, LabelMode, NoteMode
@@ -23,14 +24,31 @@ from app.models.punch_config import LABEL_MAX_LENGTH, NOTE_MAX_LENGTH
 class PunchInputError(Exception):
     """O que o funcionario mandou nao satisfaz a configuracao da empresa.
 
-    Carrega `user_message` porque o texto vai para a tela de quem esta com o
-    celular na mao: "Escolha o tipo da batida" resolve, "422 Unprocessable
-    Entity" nao.
+    Carrega a chave da mensagem porque o texto vai para a tela de quem esta
+    com o celular na mao: "Escolha o tipo da batida" resolve, "422
+    Unprocessable Entity" nao.
+
+    `texto_do_tenant` existe para um caso so: o `note_prompt` que o RH
+    escreveu. Aquilo e dado da empresa, nao string do produto — traduzir o que
+    o cliente digitou seria reescrever a pergunta dele.
     """
 
-    def __init__(self, message: str, *, user_message: str) -> None:
-        super().__init__(message)
-        self.user_message = user_message
+    def __init__(
+        self,
+        chave: Msg,
+        /,
+        *,
+        texto_do_tenant: str | None = None,
+        **parametros: object,
+    ) -> None:
+        self.chave = chave
+        self.parametros = parametros
+        self.texto_do_tenant = texto_do_tenant
+        super().__init__(texto_do_tenant or traduzir(chave, IDIOMA_PADRAO, **parametros))
+
+    def mensagem(self, idioma: str) -> str:
+        """Texto final: o do RH quando existe, o do catalogo quando nao."""
+        return self.texto_do_tenant or traduzir(self.chave, idioma, **self.parametros)
 
 
 @dataclass(frozen=True)
@@ -89,10 +107,7 @@ def resolve(
 def _sem_configuracao(label: str | None, note: str | None) -> PunchInput:
     """Empresa sem config: nao ha campo para preencher, e mandar um e erro."""
     if _limpo(label) or _limpo(note):
-        raise PunchInputError(
-            "Batida trouxe rotulo/observacao sem configuracao que os peca",
-            user_message="Este ponto nao aceita observacao nem tipo. Atualize o app.",
-        )
+        raise PunchInputError(Msg.APP_DESATUALIZADO)
     return PunchInput(label=None, note=None, entry_type=None)
 
 
@@ -101,25 +116,16 @@ def _resolver_nota(config: PunchConfig, note: str | None) -> str | None:
 
     if config.note_mode is NoteMode.HIDDEN:
         if texto:
-            raise PunchInputError(
-                "Observacao enviada com note_mode=hidden",
-                user_message="Este ponto nao aceita observacao.",
-            )
+            raise PunchInputError(Msg.OBSERVACAO_NAO_ACEITA)
         return None
 
     if not texto:
         if config.note_mode is NoteMode.REQUIRED:
-            raise PunchInputError(
-                "Observacao obrigatoria ausente",
-                user_message=config.note_prompt or "Escreva uma observacao para continuar.",
-            )
+            raise PunchInputError(Msg.OBSERVACAO_OBRIGATORIA, texto_do_tenant=config.note_prompt)
         return None
 
     if len(texto) > NOTE_MAX_LENGTH:
-        raise PunchInputError(
-            f"Observacao com {len(texto)} caracteres, teto {NOTE_MAX_LENGTH}",
-            user_message=f"A observacao passa de {NOTE_MAX_LENGTH} caracteres.",
-        )
+        raise PunchInputError(Msg.OBSERVACAO_LONGA, limit=NOTE_MAX_LENGTH)
     return texto
 
 
@@ -128,36 +134,24 @@ def _resolver_rotulo(config: PunchConfig, label: str | None) -> str | None:
 
     if config.label_mode is LabelMode.HIDDEN:
         if texto:
-            raise PunchInputError(
-                "Rotulo enviado com label_mode=hidden",
-                user_message="Este ponto nao aceita tipo de batida.",
-            )
+            raise PunchInputError(Msg.TIPO_NAO_ACEITO)
         return None
 
     if not texto:
         if config.label_required:
-            raise PunchInputError(
-                "Rotulo obrigatorio ausente",
-                user_message="Escolha o tipo da batida para continuar.",
-            )
+            raise PunchInputError(Msg.TIPO_OBRIGATORIO)
         return None
 
     if config.label_mode is LabelMode.FREE:
         if len(texto) > LABEL_MAX_LENGTH:
-            raise PunchInputError(
-                f"Rotulo com {len(texto)} caracteres, teto {LABEL_MAX_LENGTH}",
-                user_message=f"O tipo da batida passa de {LABEL_MAX_LENGTH} caracteres.",
-            )
+            raise PunchInputError(Msg.TIPO_LONGO, limit=LABEL_MAX_LENGTH)
         return texto
 
     # LIST: so vale o que o RH cadastrou. Aceitar texto livre aqui deixaria o
     # funcionario inventar um tipo que nao mapeia para jornada nenhuma.
     escolhido = _achar_rotulo(config, texto)
     if escolhido is None:
-        raise PunchInputError(
-            f"Rotulo {texto!r} nao esta entre as opcoes ativas",
-            user_message="Este tipo de batida nao existe mais. Atualize o app e tente de novo.",
-        )
+        raise PunchInputError(Msg.TIPO_INEXISTENTE)
     return escolhido.name
 
 

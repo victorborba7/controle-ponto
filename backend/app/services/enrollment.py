@@ -21,6 +21,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.messages import IDIOMA_PADRAO, Msg, traduzir
 from app.db.repository import TenantRepository
 from app.facial import FacialError, cosine_similarity
 from app.facial.base import FaceEmbedding
@@ -36,22 +37,56 @@ FACE_STORAGE_PREFIX = "faces"
 
 
 class EnrollmentError(Exception):
-    """Falha que impede o cadastro biometrico inteiro."""
+    """Falha que impede o cadastro biometrico inteiro.
+
+    Carrega a chave da mensagem e os parametros dela, em vez do texto: quem
+    levanta o erro nao sabe o idioma de quem esta no painel. A borda HTTP
+    resolve com `traduzir(exc.chave, idioma, **exc.parametros)`.
+
+    O `str(exc)` continua legivel — em ingles, fixo — porque e o que vai para
+    o log, e log traduzido e log que nao se consegue procurar.
+    """
+
+    chave: Msg = Msg.IMAGEM_ILEGIVEL
+
+    def __init__(self, **parametros: object) -> None:
+        self.parametros = parametros
+        super().__init__(traduzir(self.chave, IDIOMA_PADRAO, **parametros))
 
 
 class ConsentRequiredError(EnrollmentError):
-    pass
+    chave = Msg.CONSENTIMENTO_OBRIGATORIO
 
 
 class NotEnoughImagesError(EnrollmentError):
-    pass
+    chave = Msg.FOTOS_DE_MENOS
+
+
+class TooManyImagesError(EnrollmentError):
+    chave = Msg.FOTOS_DE_MAIS
+
+
+class NotEnoughUsableImagesError(EnrollmentError):
+    """Chegaram fotos suficientes, mas poucas serviram.
+
+    Guarda a lista de recusas para a borda HTTP remontar o "Problemas: ..." no
+    idioma de quem pediu — o texto ja embutido em `parametros` esta em ingles.
+    """
+
+    chave = Msg.POUCAS_FOTOS_COM_QUALIDADE
+
+    def __init__(self, *, rejected: list[RejectedImage], **parametros: object) -> None:
+        super().__init__(**parametros)
+        self.rejected = rejected
 
 
 class InconsistentImagesError(EnrollmentError):
     """As fotos enviadas nao sao todas da mesma pessoa."""
 
-    def __init__(self, message: str, worst_score: float) -> None:
-        super().__init__(message)
+    chave = Msg.PESSOAS_DIFERENTES
+
+    def __init__(self, *, worst_score: float, **parametros: object) -> None:
+        super().__init__(score=f"{worst_score:.2f}", **parametros)
         self.worst_score = worst_score
 
 
@@ -88,9 +123,7 @@ async def enroll_face(
     auditavel.
     """
     if not consent.granted:
-        raise ConsentRequiredError(
-            "Cadastro biometrico exige consentimento explicito do funcionario"
-        )
+        raise ConsentRequiredError()
 
     _validate_count(len(images))
 
@@ -99,10 +132,12 @@ async def enroll_face(
     # Contado sobre as fotos que passaram na qualidade: se sobrarem menos que o
     # minimo, o cadastro nao se sustenta mesmo que o envio tivesse quantidade.
     if len(accepted) < settings.face_min_enrollment_images:
-        raise NotEnoughImagesError(
-            f"Apenas {len(accepted)} de {len(images)} fotos tem qualidade suficiente; "
-            f"o cadastro exige {settings.face_min_enrollment_images}. "
-            f"Problemas: {_summarize(rejected)}"
+        raise NotEnoughUsableImagesError(
+            accepted=len(accepted),
+            total=len(images),
+            minimum=settings.face_min_enrollment_images,
+            problems=resumir_recusas(rejected, IDIOMA_PADRAO),
+            rejected=rejected,
         )
 
     _ensure_same_person([embedding for _, embedding in accepted])
@@ -154,14 +189,9 @@ def _validate_count(quantity: int) -> None:
     maximum = settings.face_max_enrollment_images
 
     if quantity < minimum:
-        raise NotEnoughImagesError(
-            f"Envie ao menos {minimum} fotos (recebidas {quantity}). "
-            "Varias fotos absorvem mudanca de luz, oculos e barba sem recadastro."
-        )
+        raise NotEnoughImagesError(minimum=minimum, quantity=quantity)
     if quantity > maximum:
-        raise NotEnoughImagesError(
-            f"Envie no maximo {maximum} fotos (recebidas {quantity})"
-        )
+        raise TooManyImagesError(maximum=maximum, quantity=quantity)
 
 
 async def _extract_embeddings(
@@ -180,16 +210,14 @@ async def _extract_embeddings(
         try:
             embedding = await engine.extract_embedding(image.content)
         except FacialError as exc:
-            rejected.append(
-                RejectedImage(filename=image.filename, reason=exc.user_message)
-            )
+            rejected.append(RejectedImage(filename=image.filename, reason=exc.chave.value))
             continue
 
         if not embedding.quality.is_acceptable:
             rejected.append(
                 RejectedImage(
                     filename=image.filename,
-                    reason="Qualidade da foto insuficiente",
+                    reason=Msg.QUALIDADE_INSUFICIENTE.value,
                     issues=list(embedding.quality.issues),
                 )
             )
@@ -214,12 +242,7 @@ def _ensure_same_person(embeddings: list[FaceEmbedding]) -> None:
         for j in range(i + 1, len(embeddings)):
             score = cosine_similarity(embeddings[i].vector, embeddings[j].vector)
             if score < threshold:
-                raise InconsistentImagesError(
-                    "As fotos enviadas nao parecem ser da mesma pessoa "
-                    f"(similaridade {score:.2f}, minimo {threshold:.2f}). "
-                    "Confira se algum arquivo foi trocado.",
-                    worst_score=score,
-                )
+                raise InconsistentImagesError(worst_score=score)
 
 
 async def _deactivate_previous(session: AsyncSession, employee: Employee) -> int:
@@ -241,9 +264,7 @@ async def _deactivate_previous(session: AsyncSession, employee: Employee) -> int
     return result.rowcount or 0
 
 
-async def deactivate_template(
-    session: AsyncSession, template: FaceTemplate
-) -> FaceTemplate:
+async def deactivate_template(session: AsyncSession, template: FaceTemplate) -> FaceTemplate:
     template.is_active = False
     template.deactivated_at = datetime.now(UTC)
     await session.flush()
@@ -261,9 +282,7 @@ async def list_templates(
     return list(result.scalars().all())
 
 
-async def load_active_templates(
-    session: AsyncSession, employee: Employee
-) -> list[FaceTemplate]:
+async def load_active_templates(session: AsyncSession, employee: Employee) -> list[FaceTemplate]:
     """Templates ativos de um funcionario, para a conferencia do ponto (Etapa 7)."""
     result = await session.execute(
         select(FaceTemplate).where(
@@ -275,29 +294,37 @@ async def load_active_templates(
     return list(result.scalars().all())
 
 
-# Traducao dos codigos de problema em orientacao acionavel. Dizer "qualidade
+# Codigo de problema -> chave da orientacao acionavel. Dizer "qualidade
 # insuficiente" nao informa a ninguem se deve chegar mais perto, acender a luz
 # ou firmar a mao — e essa mensagem e a unica coisa que a pessoa ve quando o
 # cadastro inteiro e recusado.
-ORIENTACAO_POR_PROBLEMA = {
-    "blurry": "foto desfocada, firme a camera",
-    "face_too_small": "rosto pequeno demais, chegue mais perto",
-    "face_too_far": "muito longe, o rosto precisa ocupar boa parte do quadro",
-    "face_cropped": "rosto cortado, centralize no enquadramento",
-    "low_detection_confidence": "melhore a iluminacao e olhe para a camera",
+ORIENTACAO_POR_PROBLEMA: dict[str, Msg] = {
+    "blurry": Msg.ORIENTACAO_DESFOCADA,
+    "face_too_small": Msg.ORIENTACAO_ROSTO_PEQUENO,
+    "face_too_far": Msg.ORIENTACAO_ROSTO_LONGE,
+    "face_cropped": Msg.ORIENTACAO_ROSTO_CORTADO,
+    "low_detection_confidence": Msg.ORIENTACAO_POUCA_CONFIANCA,
 }
 
 
-def _summarize(rejected: list[RejectedImage]) -> str:
+def resumir_recusas(rejected: list[RejectedImage], idioma: str) -> str:
+    """Descreve foto a foto por que cada uma foi recusada.
+
+    Publica porque a borda HTTP a chama de novo, no idioma de quem pediu: o
+    texto montado no `raise` fica em ingles, que e o que serve para o log.
+    """
     if not rejected:
-        return "nenhum"
+        return "—"
 
     partes = []
     for item in rejected:
-        detalhe = (
-            "; ".join(ORIENTACAO_POR_PROBLEMA.get(i, i) for i in item.issues)
-            if item.issues
-            else item.reason
-        )
+        if item.issues:
+            detalhe = "; ".join(
+                traduzir(ORIENTACAO_POR_PROBLEMA[i], idioma) if i in ORIENTACAO_POR_PROBLEMA else i
+                for i in item.issues
+            )
+        else:
+            # `reason` e chave do catalogo, nao prosa — ver `RejectedImage`.
+            detalhe = traduzir(Msg(item.reason), idioma)
         partes.append(f"{item.filename} ({detalhe})")
     return " · ".join(partes)

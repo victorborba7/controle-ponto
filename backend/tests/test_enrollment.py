@@ -10,6 +10,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.messages import Msg, traduzir
 from app.facial.stub import stub_image, stub_image_variant, stub_image_with_faces
 from app.models import Consent, FaceTemplate
 from app.models.enums import ConsentType
@@ -114,9 +115,7 @@ async def test_templates_ficam_persistidos_com_o_embedding(
         assert template.tenant_id == cenario["tenant"].id
 
 
-async def test_contador_do_funcionario_reflete_o_cadastro(
-    client: AsyncClient, cenario: dict
-):
+async def test_contador_do_funcionario_reflete_o_cadastro(client: AsyncClient, cenario: dict):
     await client.post(
         cenario["url"],
         headers=cenario["headers"],
@@ -155,7 +154,7 @@ async def test_duas_fotos_e_pouco(client: AsyncClient, cenario: dict):
     )
 
     assert response.status_code == 422
-    assert "ao menos 3" in response.json()["detail"]
+    assert response.json()["detail"] == traduzir(Msg.FOTOS_DE_MENOS, minimum=3, quantity=2)
 
 
 async def test_seis_fotos_e_demais(client: AsyncClient, cenario: dict):
@@ -167,7 +166,7 @@ async def test_seis_fotos_e_demais(client: AsyncClient, cenario: dict):
     )
 
     assert response.status_code == 422
-    assert "no maximo 5" in response.json()["detail"]
+    assert response.json()["detail"] == traduzir(Msg.FOTOS_DE_MAIS, maximum=5, quantity=6)
 
 
 # --------------------------------------------------------------------------
@@ -191,15 +190,13 @@ async def test_foto_de_outra_pessoa_no_meio_derruba_o_cadastro(
     )
 
     assert response.status_code == 422
-    assert "nao parecem ser da mesma pessoa" in response.json()["detail"]
+    assert "same person" in response.json()["detail"]
 
     # Nada foi gravado.
     assert (await db.execute(select(FaceTemplate))).scalars().all() == []
 
 
-async def test_foto_sem_rosto_e_recusada_sem_derrubar_as_outras(
-    client: AsyncClient, cenario: dict
-):
+async def test_foto_sem_rosto_e_recusada_sem_derrubar_as_outras(client: AsyncClient, cenario: dict):
     """Uma foto ruim nao invalida o envio — o RH so reenvia aquela."""
     arquivos = _fotos_da_mesma_pessoa(3)
     arquivos.append(("images", ("vazia.png", stub_image((0, 0, 0)), "image/png")))
@@ -230,12 +227,10 @@ async def test_foto_com_duas_pessoas_e_recusada(client: AsyncClient, cenario: di
 
     recusadas = response.json()["rejected"]
     assert len(recusadas) == 1
-    assert "mais de um rosto" in recusadas[0]["reason"].lower()
+    assert recusadas[0]["reason"] == Msg.VARIOS_ROSTOS.value
 
 
-async def test_fotos_ruins_demais_reprovam_o_cadastro_inteiro(
-    client: AsyncClient, cenario: dict
-):
+async def test_fotos_ruins_demais_reprovam_o_cadastro_inteiro(client: AsyncClient, cenario: dict):
     """Se sobrarem menos que o minimo apos a triagem, o cadastro nao se sustenta."""
     arquivos = [
         ("images", ("boa.png", stub_image(PESSOA_A), "image/png")),
@@ -248,7 +243,7 @@ async def test_fotos_ruins_demais_reprovam_o_cadastro_inteiro(
     )
 
     assert response.status_code == 422
-    assert "qualidade suficiente" in response.json()["detail"]
+    assert "usable" in response.json()["detail"]
 
 
 # --------------------------------------------------------------------------
@@ -268,7 +263,7 @@ async def test_sem_consentimento_nao_ha_cadastro(
     )
 
     assert response.status_code == 403
-    assert "consentimento" in response.json()["detail"].lower()
+    assert response.json()["detail"] == traduzir(Msg.CONSENTIMENTO_OBRIGATORIO)
     assert (await db.execute(select(FaceTemplate))).scalars().all() == []
 
 
@@ -328,9 +323,7 @@ async def test_recadastro_desativa_os_templates_anteriores(
     assert all(t.deactivated_at is not None for t in inativos)
 
 
-async def test_listagem_traz_apenas_os_ativos_por_padrao(
-    client: AsyncClient, cenario: dict
-):
+async def test_listagem_traz_apenas_os_ativos_por_padrao(client: AsyncClient, cenario: dict):
     await client.post(
         cenario["url"],
         headers=cenario["headers"],
@@ -362,17 +355,13 @@ async def test_desativar_um_template(client: AsyncClient, db: AsyncSession, cena
     )
     template_id = criado.json()["created"][0]["id"]
 
-    response = await client.delete(
-        f"{cenario['url']}/{template_id}", headers=cenario["headers"]
-    )
+    response = await client.delete(f"{cenario['url']}/{template_id}", headers=cenario["headers"])
 
     assert response.status_code == 200
     assert response.json()["is_active"] is False
 
     # Exclusao logica: o registro permanece.
-    ainda_existe = await db.scalar(
-        select(FaceTemplate).where(FaceTemplate.id == template_id)
-    )
+    ainda_existe = await db.scalar(select(FaceTemplate).where(FaceTemplate.id == template_id))
     assert ainda_existe is not None
 
 

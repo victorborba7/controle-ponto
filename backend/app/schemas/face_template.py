@@ -37,9 +37,12 @@ class FaceTemplateSummary(BaseModel):
 class RejectedImage(BaseModel):
     """Foto que nao virou template, e por que.
 
-    O motivo volta em codigo (`blurry`, `face_too_small`) para o painel poder
-    traduzir numa orientacao acionavel — "firme a mao", "chegue mais perto" —
-    em vez de exibir um erro tecnico.
+    `reason` e `issues` sao codigos (`multiple_faces`, `blurry`,
+    `face_too_small`), nunca prosa: o painel os transforma em orientacao
+    acionavel — "firme a mao", "chegue mais perto" — no idioma de quem esta
+    olhando. Texto pronto aqui obrigaria o servidor a adivinhar esse idioma.
+
+    Os codigos de `reason` sao os valores de `app.core.messages.Msg`.
     """
 
     filename: str

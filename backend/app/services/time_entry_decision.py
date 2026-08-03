@@ -15,6 +15,7 @@ ha uma pessoa tentando bater o ponto de outra.
 
 from dataclasses import dataclass
 
+from app.core.messages import Msg
 from app.facial.base import MatchOutcome
 from app.models.enums import TimeEntryStatus
 from app.services.location_validator import LocationVerdict
@@ -23,9 +24,13 @@ from app.services.location_validator import LocationVerdict
 @dataclass(frozen=True)
 class EntryDecision:
     status: TimeEntryStatus
+    #: Motivo tecnico, gravado no registro e lido pelo RH na conferencia.
+    #: Fica em uma lingua so, de proposito: e trilha de auditoria, e trilha
+    #: traduzida e trilha que nao se consegue procurar depois.
     reason: str
-    #: Texto para o app mostrar ao funcionario. Fala de acao, nao de sistema.
-    message: str
+    #: Chave do texto que o app mostra ao funcionario. Fala de acao, nao de
+    #: sistema. Resolvida na borda HTTP, no idioma do aparelho.
+    chave: Msg
 
     @property
     def accepted(self) -> bool:
@@ -51,7 +56,7 @@ def decide(
                 if face_score is not None
                 else "O rosto nao corresponde ao cadastro"
             ),
-            message="Nao reconhecemos seu rosto. Tente novamente com melhor iluminacao.",
+            chave=Msg.ROSTO_NAO_RECONHECIDO,
         )
 
     pendencias: list[str] = []
@@ -75,13 +80,13 @@ def decide(
         return EntryDecision(
             status=TimeEntryStatus.APPROVED,
             reason=location.reason,
-            message="Ponto registrado.",
+            chave=Msg.PONTO_REGISTRADO,
         )
 
     return EntryDecision(
         status=TimeEntryStatus.PENDING_REVIEW,
         reason="; ".join(pendencias),
-        message="Ponto registrado e enviado para conferencia do RH.",
+        chave=Msg.PONTO_EM_CONFERENCIA,
     )
 
 

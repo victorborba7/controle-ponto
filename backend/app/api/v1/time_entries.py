@@ -27,11 +27,14 @@ from app.api.deps import (
     CurrentAdmin,
     CurrentEmployee,
     FaceEngineDep,
+    Locale,
     SessionDep,
     StorageDep,
     TenantRepo,
+    erro_http,
     require_roles,
 )
+from app.core.messages import Msg, traduzir
 from app.facial.imaging import MAX_IMAGE_BYTES
 from app.models import Device, Employee, Site, TimeEntry
 from app.models.enums import (
@@ -64,16 +67,18 @@ def _client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
 
 
-async def _read_selfie(upload: UploadFile) -> bytes:
+async def _read_selfie(upload: UploadFile, idioma: str) -> bytes:
     """Le a selfie com teto de tamanho aplicado durante a leitura."""
     chunks: list[bytes] = []
     total = 0
     while chunk := await upload.read(64 * 1024):
         total += len(chunk)
         if total > MAX_IMAGE_BYTES:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"A foto excede o limite de {MAX_IMAGE_BYTES // (1024 * 1024)} MB",
+            raise erro_http(
+                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                Msg.FOTO_GRANDE_DEMAIS,
+                idioma,
+                limit=MAX_IMAGE_BYTES // (1024 * 1024),
             )
         chunks.append(chunk)
     return b"".join(chunks)
@@ -92,6 +97,7 @@ async def punch(
     engine: FaceEngineDep,
     storage: StorageDep,
     request: Request,
+    idioma: Locale,
     selfie: UploadFile = File(..., description="Foto do rosto no momento da batida"),
     evidence: str = Form(
         ...,
@@ -138,14 +144,10 @@ async def punch(
 
     employee = await repo.get(Employee, principal.subject_id)
     if employee is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Funcionario nao encontrado"
-        )
+        raise erro_http(status.HTTP_401_UNAUTHORIZED, Msg.FUNCIONARIO_NAO_ENCONTRADO, idioma)
 
-    device = (
-        await repo.get(Device, principal.device_id) if principal.device_id else None
-    )
-    selfie_bytes = await _read_selfie(selfie)
+    device = await repo.get(Device, principal.device_id) if principal.device_id else None
+    selfie_bytes = await _read_selfie(selfie, idioma)
 
     try:
         resultado = await service.punch(
@@ -176,31 +178,28 @@ async def punch(
             ip_address=_client_ip(request),
         )
         await session.commit()
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.user_message
+        raise erro_http(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, exc.chave, idioma, **exc.parametros
         ) from exc
     except punch_config_service.PunchInputError as exc:
         # Recusa barata: nada foi processado e nada foi gravado. O texto vai
-        # direto para a tela de quem esta com o celular na mao.
+        # direto para a tela de quem esta com o celular na mao — e pode ser o
+        # que o RH escreveu, nao o do catalogo.
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.user_message
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=exc.mensagem(idioma),
         ) from exc
     except service.TooSoonError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Voce acabou de bater o ponto. Aguarde um momento.",
-        ) from exc
-    except service.DeviceNotTrustedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail=exc.user_message
-        ) from exc
-    except service.NoFaceTemplatesError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_412_PRECONDITION_FAILED, detail=exc.user_message
+        raise erro_http(status.HTTP_409_CONFLICT, exc.chave, idioma, **exc.parametros) from exc
+    except (service.DeviceNotTrustedError, service.DeviceUnlinkedError) as exc:
+        raise erro_http(status.HTTP_403_FORBIDDEN, exc.chave, idioma, **exc.parametros) from exc
+    except (service.NoFaceTemplatesError, service.StaleTemplateError) as exc:
+        raise erro_http(
+            status.HTTP_412_PRECONDITION_FAILED, exc.chave, idioma, **exc.parametros
         ) from exc
     except service.TimeEntryError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.user_message
+        raise erro_http(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, exc.chave, idioma, **exc.parametros
         ) from exc
 
     if not resultado.duplicate:
@@ -222,7 +221,7 @@ async def punch(
 
     return TimeEntryCreated(
         entry=TimeEntrySummary.model_validate(resultado.entry),
-        message=resultado.decision.message,
+        message=traduzir(resultado.decision.chave, idioma),
         duplicate=resultado.duplicate,
     )
 
@@ -247,9 +246,7 @@ async def my_entries(
     """
     query = service.build_query(repo, employee_id=principal.subject_id)
 
-    total = await repo.session.scalar(
-        select(func.count()).select_from(query.subquery())
-    )
+    total = await repo.session.scalar(select(func.count()).select_from(query.subquery()))
     result = await repo.session.execute(query.limit(limit).offset(offset))
 
     return MyTimeEntryList(
@@ -288,9 +285,7 @@ async def list_entries(
         end=end,
     )
 
-    total = await repo.session.scalar(
-        select(func.count()).select_from(query.subquery())
-    )
+    total = await repo.session.scalar(select(func.count()).select_from(query.subquery()))
     result = await repo.session.execute(query.limit(limit).offset(offset))
     entries = list(result.scalars().all())
 
@@ -309,16 +304,15 @@ async def get_entry(
     _: CurrentAdmin,
     repo: TenantRepo,
     session: SessionDep,
+    idioma: Locale,
 ) -> TimeEntryWithEmployee:
-    entry = await _entry_or_404(repo, entry_id)
+    entry = await _entry_or_404(repo, entry_id, idioma)
     employees = await service.load_employees_for(session, [entry])
     sites = await _load_sites(repo, [entry])
     return _with_names(entry, employees, sites)
 
 
-@router.patch(
-    "/{entry_id}/review", response_model=TimeEntryWithEmployee, dependencies=REVISAO
-)
+@router.patch("/{entry_id}/review", response_model=TimeEntryWithEmployee, dependencies=REVISAO)
 async def review(
     entry_id: uuid.UUID,
     payload: TimeEntryReview,
@@ -326,18 +320,21 @@ async def review(
     repo: TenantRepo,
     session: SessionDep,
     request: Request,
+    idioma: Locale,
 ) -> TimeEntryWithEmployee:
     """Aprova ou rejeita uma pendencia.
 
     Quem revisou e quando ficam gravados no proprio registro: uma aprovacao sem
     autor nao serve de defesa em discussao trabalhista.
     """
-    entry = await _entry_or_404(repo, entry_id)
+    entry = await _entry_or_404(repo, entry_id, idioma)
 
     if entry.status is not TimeEntryStatus.PENDING_REVIEW:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Este registro nao esta pendente (situacao atual: {entry.status.value})",
+        raise erro_http(
+            status.HTTP_409_CONFLICT,
+            Msg.REGISTRO_NAO_PENDENTE,
+            idioma,
+            status=entry.status.value,
         )
 
     _, horario_anterior = await service.review_entry(
@@ -380,6 +377,7 @@ async def get_selfie(
     _: CurrentAdmin,
     repo: TenantRepo,
     storage: StorageDep,
+    idioma: Locale,
 ) -> Response:
     """Foto do momento da batida, decifrada.
 
@@ -388,14 +386,11 @@ async def get_selfie(
 
     `no-store` no cache para o navegador nao deixar copia em disco.
     """
-    entry = await _entry_or_404(repo, entry_id)
+    entry = await _entry_or_404(repo, entry_id, idioma)
     imagem = await service.load_selfie(storage, entry)
 
     if imagem is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="A foto deste registro nao esta mais disponivel",
-        )
+        raise erro_http(status.HTTP_404_NOT_FOUND, Msg.FOTO_INDISPONIVEL, idioma)
 
     return Response(
         content=imagem,
@@ -489,9 +484,7 @@ async def export_csv(
         # BOM para o Excel reconhecer UTF-8 e nao quebrar os acentos.
         content="﻿" + buffer.getvalue(),
         media_type="text/csv; charset=utf-8",
-        headers={
-            "Content-Disposition": f'attachment; filename="pontos-{momento}.csv"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="pontos-{momento}.csv"'},
     )
 
 
@@ -528,18 +521,14 @@ def _decimal(valor: float | None, casas: int = 2) -> str:
 # --------------------------------------------------------------------------
 
 
-async def _entry_or_404(repo: TenantRepo, entry_id: uuid.UUID) -> TimeEntry:
+async def _entry_or_404(repo: TenantRepo, entry_id: uuid.UUID, idioma: str) -> TimeEntry:
     entry = await repo.get(TimeEntry, entry_id)
     if entry is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Registro nao encontrado"
-        )
+        raise erro_http(status.HTTP_404_NOT_FOUND, Msg.REGISTRO_NAO_ENCONTRADO, idioma)
     return entry
 
 
-async def _load_sites(
-    repo: TenantRepo, entries: list[TimeEntry]
-) -> dict[uuid.UUID, Site]:
+async def _load_sites(repo: TenantRepo, entries: list[TimeEntry]) -> dict[uuid.UUID, Site]:
     ids = {entry.site_id for entry in entries if entry.site_id}
     if not ids:
         return {}

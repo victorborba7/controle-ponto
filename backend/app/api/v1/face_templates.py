@@ -23,11 +23,14 @@ from pydantic import ValidationError
 from app.api.deps import (
     CurrentAdmin,
     FaceEngineDep,
+    Locale,
     SessionDep,
     StorageDep,
     TenantRepo,
+    erro_http,
     require_roles,
 )
+from app.core.messages import Msg
 from app.facial.imaging import MAX_IMAGE_BYTES
 from app.models import Employee, FaceTemplate
 from app.models.enums import AuditAction, UserRole
@@ -52,16 +55,14 @@ def _client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
 
 
-async def _get_employee_or_404(repo: TenantRepo, employee_id: uuid.UUID) -> Employee:
+async def _get_employee_or_404(repo: TenantRepo, employee_id: uuid.UUID, idioma: str) -> Employee:
     employee = await repo.get(Employee, employee_id)
     if employee is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Funcionario nao encontrado"
-        )
+        raise erro_http(status.HTTP_404_NOT_FOUND, Msg.FUNCIONARIO_NAO_ENCONTRADO, idioma)
     return employee
 
 
-async def _read_upload(upload: UploadFile) -> UploadedImage:
+async def _read_upload(upload: UploadFile, idioma: str) -> UploadedImage:
     """Le o arquivo com teto de tamanho.
 
     O teto e aplicado durante a leitura, e nao depois: deixar um upload de
@@ -73,14 +74,16 @@ async def _read_upload(upload: UploadFile) -> UploadedImage:
     while chunk := await upload.read(64 * 1024):
         total += len(chunk)
         if total > MAX_IMAGE_BYTES:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"A foto {upload.filename} excede o limite de "
-                f"{MAX_IMAGE_BYTES // (1024 * 1024)} MB",
+            raise erro_http(
+                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                Msg.FOTO_NOMEADA_GRANDE_DEMAIS,
+                idioma,
+                filename=upload.filename,
+                limit=MAX_IMAGE_BYTES // (1024 * 1024),
             )
         chunks.append(chunk)
 
-    return UploadedImage(filename=upload.filename or "sem-nome", content=b"".join(chunks))
+    return UploadedImage(filename=upload.filename or "unnamed", content=b"".join(chunks))
 
 
 @router.post(
@@ -97,12 +100,9 @@ async def enroll(
     engine: FaceEngineDep,
     storage: StorageDep,
     request: Request,
-    images: list[UploadFile] = File(
-        ..., description="De 3 a 5 fotos do rosto do funcionario"
-    ),
-    consent_policy_version: str = Form(
-        ..., description="Versao do termo de consentimento aceito"
-    ),
+    idioma: Locale,
+    images: list[UploadFile] = File(..., description="De 3 a 5 fotos do rosto do funcionario"),
+    consent_policy_version: str = Form(..., description="Versao do termo de consentimento aceito"),
     consent_granted: bool = Form(
         ..., description="Confirma que o funcionario consentiu com o uso da biometria"
     ),
@@ -115,18 +115,16 @@ async def enroll(
     Multipart, e nao JSON com base64: base64 infla o payload em 33% e forcaria
     carregar tudo na memoria de uma vez.
     """
-    employee = await _get_employee_or_404(repo, employee_id)
+    employee = await _get_employee_or_404(repo, employee_id, idioma)
 
     try:
-        consent = ConsentDeclaration(
-            policy_version=consent_policy_version, granted=consent_granted
-        )
+        consent = ConsentDeclaration(policy_version=consent_policy_version, granted=consent_granted)
     except ValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors()
         ) from exc
 
-    uploads = [await _read_upload(image) for image in images]
+    uploads = [await _read_upload(image, idioma) for image in images]
 
     try:
         outcome = await enrollment_service.enroll_face(
@@ -141,13 +139,22 @@ async def enroll(
             user_agent=request.headers.get("user-agent", "")[:400] or None,
         )
     except enrollment_service.ConsentRequiredError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    except (
-        enrollment_service.NotEnoughImagesError,
-        enrollment_service.InconsistentImagesError,
-    ) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        raise erro_http(status.HTTP_403_FORBIDDEN, exc.chave, idioma, **exc.parametros) from exc
+    except enrollment_service.NotEnoughUsableImagesError as exc:
+        # O "Problemas: ..." e remontado aqui: o texto que veio no `raise` esta
+        # em ingles, que serve para o log e nao para a tela do RH.
+        raise erro_http(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            exc.chave,
+            idioma,
+            **{
+                **exc.parametros,
+                "problems": enrollment_service.resumir_recusas(exc.rejected, idioma),
+            },
+        ) from exc
+    except enrollment_service.EnrollmentError as exc:
+        raise erro_http(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, exc.chave, idioma, **exc.parametros
         ) from exc
 
     await audit.record_for(
@@ -180,9 +187,10 @@ async def list_templates(
     employee_id: uuid.UUID,
     _: CurrentAdmin,
     repo: TenantRepo,
+    idioma: Locale,
     include_inactive: bool = Query(default=False),
 ) -> FaceTemplateList:
-    await _get_employee_or_404(repo, employee_id)
+    await _get_employee_or_404(repo, employee_id, idioma)
     templates = await enrollment_service.list_templates(
         repo, employee_id, include_inactive=include_inactive
     )
@@ -200,6 +208,7 @@ async def deactivate_template(
     repo: TenantRepo,
     session: SessionDep,
     request: Request,
+    idioma: Locale,
 ) -> FaceTemplateSummary:
     """Desativa um template. O registro permanece, para auditoria.
 
@@ -207,13 +216,11 @@ async def deactivate_template(
     pontos ja aprovados apontam para este template e precisam continuar
     explicaveis.
     """
-    await _get_employee_or_404(repo, employee_id)
+    await _get_employee_or_404(repo, employee_id, idioma)
 
     template = await repo.get(FaceTemplate, template_id)
     if template is None or template.employee_id != employee_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Template nao encontrado"
-        )
+        raise erro_http(status.HTTP_404_NOT_FOUND, Msg.TEMPLATE_NAO_ENCONTRADO, idioma)
 
     await enrollment_service.deactivate_template(session, template)
 
