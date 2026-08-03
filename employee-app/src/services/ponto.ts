@@ -22,6 +22,9 @@ export type RespostaPonto = {
     recorded_at: string;
     status: "approved" | "pending_review" | "rejected";
     location_method: "beacon" | "wifi" | "gps" | "none";
+    /** O que o funcionário declarou, quando a empresa pede. */
+    label: string | null;
+    note: string | null;
   };
   message: string;
   duplicate: boolean;
@@ -92,9 +95,16 @@ async function montarFormulario(batida: BatidaPendente): Promise<FormData> {
   dados.append("idempotency_key", batida.idempotencyKey);
   dados.append("client_recorded_at", batida.capturadaEm);
 
+  // Só vão se a empresa os pedir. Mandar campo vazio quando a configuração é
+  // "oculto" faria o servidor recusar a batida.
+  if (batida.rotulo) dados.append("label", batida.rotulo);
+  if (batida.observacao) dados.append("note", batida.observacao);
+
   // `entry_type` fica de fora de propósito: o servidor deduz entrada ou saída
   // pela última batida, o que tira do funcionário uma escolha que ele pode
-  // errar — e um erro aí vira hora extra fantasma ou falta indevida.
+  // errar — e um erro aí vira hora extra fantasma ou falta indevida. A exceção
+  // é o rótulo escolhido de uma lista do RH, e mesmo aí quem traduz rótulo em
+  // tipo é o servidor, não o app.
   return dados;
 }
 
@@ -108,6 +118,7 @@ async function montarFormulario(batida: BatidaPendente): Promise<FormData> {
 export async function baterPonto(
   fotoUri: string,
   sinais: SinaisColetados,
+  declarado: { rotulo?: string; observacao?: string } = {},
 ): Promise<ResultadoEnvio> {
   const batida: BatidaPendente = {
     idempotencyKey: novaChave(),
@@ -115,6 +126,8 @@ export async function baterPonto(
     sinais,
     capturadaEm: new Date().toISOString(),
     tentativas: 0,
+    rotulo: declarado.rotulo?.trim() || undefined,
+    observacao: declarado.observacao?.trim() || undefined,
   };
 
   try {

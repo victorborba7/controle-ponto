@@ -1,9 +1,17 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Location from "expo-location";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import type { Perfil } from "../services/api";
+import {
+  CONFIG_PADRAO,
+  faltaPreencher,
+  lerCache as lerConfigBatida,
+  pedeAlgo,
+  sincronizarConfig,
+  type ConfigBatida,
+} from "../services/configBatida";
 import { lerFila } from "../services/fila";
 import {
   coletarSinais,
@@ -12,7 +20,7 @@ import {
   type ResumoColeta,
 } from "../services/localizacao";
 import { baterPonto, sincronizar } from "../services/ponto";
-import { Aviso, Botao, Cartao, Legenda, Titulo, cores } from "../ui";
+import { Aviso, Botao, Cartao, Legenda, Titulo, cores, estilosCampo } from "../ui";
 
 type Etapa =
   | { nome: "ocioso" }
@@ -48,6 +56,17 @@ export function BaterPonto({
    */
   const [descartadas, setDescartadas] = useState(0);
 
+  /**
+   * O que esta empresa pede na batida.
+   *
+   * Começa no padrão (nada) e é substituído pelo cache, e só então pelo
+   * servidor. A ordem importa: a tela precisa estar utilizável no primeiro
+   * quadro, mesmo sem sinal.
+   */
+  const [config, setConfig] = useState<ConfigBatida>(CONFIG_PADRAO);
+  const [rotulo, setRotulo] = useState<string | null>(null);
+  const [observacao, setObservacao] = useState("");
+
   // O BleManager mantém o rádio ligado enquanto existe; encerrar ao sair da
   // tela evita consumo de bateria com o app aberto e parado.
   useEffect(() => encerrarBle, []);
@@ -56,6 +75,15 @@ export function BaterPonto({
     Location.getForegroundPermissionsAsync().then((r) =>
       setPermissaoLocalizacao(r.granted),
     );
+  }, []);
+
+  // Cache primeiro, servidor depois: a tela fica utilizável mesmo sem sinal, e
+  // se atualiza quando houver.
+  useEffect(() => {
+    lerConfigBatida()
+      .then(setConfig)
+      .then(() => sincronizarConfig().then(setConfig))
+      .catch(() => undefined);
   }, []);
 
   const atualizarPendentes = useCallback(async () => {
@@ -78,6 +106,15 @@ export function BaterPonto({
   }
 
   async function registrar() {
+    // Antes de acionar a câmera: numa área sem sinal a batida iria para a fila
+    // e a recusa por campo faltando só apareceria horas depois, na
+    // sincronização — quando já não dá para corrigir o que se ia escrever.
+    const pendencia = faltaPreencher(config, { label: rotulo, note: observacao });
+    if (pendencia) {
+      setEtapa({ nome: "erro", mensagem: pendencia });
+      return;
+    }
+
     setEtapa({ nome: "coletando", detalhe: "Procurando beacons do local…" });
 
     let resumo: ResumoColeta;
@@ -107,14 +144,25 @@ export function BaterPonto({
 
     setEtapa({ nome: "enviando" });
 
-    const resultado = await baterPonto(fotoUri, resumo.sinais);
+    const resultado = await baterPonto(fotoUri, resumo.sinais, {
+      rotulo: rotulo ?? undefined,
+      observacao,
+    });
     await atualizarPendentes();
 
     if (resultado.situacao === "enviado") {
       const entry = resultado.resposta.entry;
+      // Os campos só se limpam quando a batida foi de fato aceita: se ela ficou
+      // na fila, o que a pessoa escreveu segue junto e continua visível.
+      setRotulo(null);
+      setObservacao("");
       setEtapa({
         nome: "concluido",
-        titulo: entry.entry_type === "in" ? "Entrada registrada" : "Saída registrada",
+        // O rótulo que a pessoa escolheu diz mais que "Entrada"/"Saída": foi o
+        // que ela leu na tela, e é como ela vai conferir se bateu o certo.
+        titulo:
+          entry.label ??
+          (entry.entry_type === "in" ? "Entrada registrada" : "Saída registrada"),
         mensagem: resultado.resposta.message,
         tipo: entry.status === "approved" ? "sucesso" : "aviso",
       });
@@ -275,6 +323,16 @@ export function BaterPonto({
           </Aviso>
         )}
 
+        {!ocupado && pedeAlgo(config) && (
+          <CamposDaBatida
+            config={config}
+            rotulo={rotulo}
+            observacao={observacao}
+            aoEscolherRotulo={setRotulo}
+            aoEscreverObservacao={setObservacao}
+          />
+        )}
+
         {ocupado ? (
           <Cartao>
             <Text style={{ color: cores.texto, fontSize: 16, textAlign: "center" }}>
@@ -312,6 +370,103 @@ export function BaterPonto({
         <Botao titulo="Sair" variante="texto" onPress={aoSair} />
       </View>
     </View>
+  );
+}
+
+/**
+ * Os campos que a empresa configurou, acima do botão de registrar.
+ *
+ * Fica na mesma tela em vez de virar um passo antes: bater ponto é gesto de
+ * segundos na porta do hangar, e uma tela a mais no caminho é a diferença
+ * entre bater e deixar para depois.
+ */
+function CamposDaBatida({
+  config,
+  rotulo,
+  observacao,
+  aoEscolherRotulo,
+  aoEscreverObservacao,
+}: {
+  config: ConfigBatida;
+  rotulo: string | null;
+  observacao: string;
+  aoEscolherRotulo: (valor: string | null) => void;
+  aoEscreverObservacao: (valor: string) => void;
+}) {
+  return (
+    <Cartao>
+      {config.label_mode === "list" && (
+        <View style={{ gap: 8 }}>
+          <Legenda>
+            Tipo da batida{config.label_required ? "" : " (opcional)"}
+          </Legenda>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {config.labels.map((opcao) => {
+              const escolhido = rotulo === opcao.name;
+              return (
+                <Pressable
+                  key={opcao.name}
+                  // Tocar de novo desmarca — sem isso, quem escolhe errado num
+                  // campo opcional não tem como voltar a não escolher.
+                  onPress={() => aoEscolherRotulo(escolhido ? null : opcao.name)}
+                  style={{
+                    paddingVertical: 10,
+                    paddingHorizontal: 14,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: escolhido ? cores.acento : cores.borda,
+                    backgroundColor: escolhido ? cores.acento : "transparent",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: escolhido ? cores.fundo : cores.texto,
+                      fontWeight: escolhido ? "700" : "500",
+                    }}
+                  >
+                    {opcao.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {config.label_mode === "free" && (
+        <View style={{ gap: 8 }}>
+          <Legenda>
+            Tipo da batida{config.label_required ? "" : " (opcional)"}
+          </Legenda>
+          <TextInput
+            style={estilosCampo.entrada}
+            value={rotulo ?? ""}
+            onChangeText={(texto) => aoEscolherRotulo(texto || null)}
+            maxLength={60}
+            placeholder="Ex.: Chegada ao hangar"
+            placeholderTextColor={cores.textoFraco}
+          />
+        </View>
+      )}
+
+      {config.note_mode !== "hidden" && (
+        <View style={{ gap: 8, marginTop: config.label_mode === "hidden" ? 0 : 16 }}>
+          <Legenda>
+            {config.note_prompt ??
+              (config.note_mode === "required" ? "Observação" : "Observação (opcional)")}
+          </Legenda>
+          <TextInput
+            style={[estilosCampo.entrada, { minHeight: 72, textAlignVertical: "top" }]}
+            value={observacao}
+            onChangeText={aoEscreverObservacao}
+            maxLength={500}
+            multiline
+            placeholder={config.note_mode === "required" ? "Obrigatório" : "Opcional"}
+            placeholderTextColor={cores.textoFraco}
+          />
+        </View>
+      )}
+    </Cartao>
   );
 }
 

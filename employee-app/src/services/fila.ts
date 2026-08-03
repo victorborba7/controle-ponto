@@ -30,6 +30,15 @@ export type BatidaPendente = {
   capturadaEm: string;
   tentativas: number;
   ultimoErro?: string;
+  /**
+   * O que o funcionário declarou, quando a empresa pede (ver `configBatida`).
+   *
+   * Vai na fila junto com a batida: uma batida represada por falta de sinal
+   * precisa subir com o que a pessoa escreveu na hora, não com o que ela
+   * escreveria horas depois.
+   */
+  rotulo?: string;
+  observacao?: string;
 };
 
 export async function lerFila(): Promise<BatidaPendente[]> {
