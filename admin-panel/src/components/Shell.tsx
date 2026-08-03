@@ -11,6 +11,7 @@ const navegacao = [
   { href: "/pontos", rotulo: "Pontos" },
   { href: "/funcionarios", rotulo: "Funcionários" },
   { href: "/locais", rotulo: "Locais" },
+  { href: "/configuracoes", rotulo: "Configurações" },
 ];
 
 type Sessao = {

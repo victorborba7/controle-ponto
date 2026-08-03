@@ -116,6 +116,9 @@ export type TimeEntry = {
   entry_type: EntryType;
   recorded_at: string;
   client_recorded_at: string | null;
+  /** O que o funcionário declarou, conforme a configuração da empresa. */
+  label: string | null;
+  note: string | null;
   status: TimeEntryStatus;
   decision_reason: string | null;
   face_match_score: number | null;
@@ -141,4 +144,42 @@ export type TimeEntryWithEmployee = TimeEntry & {
 export type Paginated<T> = {
   items: T[];
   total: number;
+};
+
+// --------------------------------------------------------------------------
+// Configuração de batida
+// --------------------------------------------------------------------------
+
+export type NoteMode = "hidden" | "optional" | "required";
+export type LabelMode = "hidden" | "free" | "list";
+
+export type PunchLabel = {
+  id: string;
+  name: string;
+  entry_type: EntryType;
+  position: number;
+  is_active: boolean;
+};
+
+/** Como o RH monta: um rótulo ainda sem id, porque pode ser novo. */
+export type PunchLabelInput = {
+  name: string;
+  entry_type: EntryType;
+  is_active: boolean;
+};
+
+export type PunchConfig = {
+  note_mode: NoteMode;
+  note_prompt: string | null;
+  label_mode: LabelMode;
+  label_required: boolean;
+  labels: PunchLabel[];
+};
+
+export type PunchConfigUpdate = {
+  note_mode: NoteMode;
+  note_prompt: string | null;
+  label_mode: LabelMode;
+  label_required: boolean;
+  labels: PunchLabelInput[];
 };

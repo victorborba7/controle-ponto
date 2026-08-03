@@ -248,7 +248,22 @@ export default function PontosPage() {
                     <div className="font-medium">{entrada.employee_name}</div>
                     <div className="text-xs text-zinc-500">{entrada.employee_code}</div>
                   </Td>
-                  <Td className="whitespace-nowrap">{rotuloTipo[entrada.entry_type]}</Td>
+                  {/* O que o funcionário escolheu vem primeiro, porque é o que
+                      ele viu na tela; o tipo apurado fica abaixo, porque é o
+                      que entra na conta de horas. Quando não há rótulo, só o
+                      tipo — sem linha vazia ocupando espaço. */}
+                  <Td className="whitespace-nowrap">
+                    {entrada.label ? (
+                      <div>
+                        <div>{entrada.label}</div>
+                        <div className="text-xs text-zinc-500">
+                          {rotuloTipo[entrada.entry_type]}
+                        </div>
+                      </div>
+                    ) : (
+                      rotuloTipo[entrada.entry_type]
+                    )}
+                  </Td>
                   <Td>
                     <div className="flex flex-col gap-1">
                       <Badge className={corMetodo[entrada.location_method]}>

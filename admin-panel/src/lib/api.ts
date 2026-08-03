@@ -74,6 +74,13 @@ export const api = {
       body: JSON.stringify(corpo),
     }),
 
+  put: <T>(caminho: string, corpo: unknown) =>
+    requisitar<T>(caminho, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corpo),
+    }),
+
   delete: <T>(caminho: string) => requisitar<T>(caminho, { method: "DELETE" }),
 
   /**

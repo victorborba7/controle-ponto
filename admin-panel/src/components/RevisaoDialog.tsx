@@ -129,6 +129,27 @@ export function RevisaoDialog({
           </div>
 
           <div className="space-y-4">
+            {/* O que o funcionário declarou, antes da evidência técnica: numa
+                contestação é a primeira coisa que se procura, e vem da pessoa,
+                não do sistema. */}
+            {(entrada.label || entrada.note) && (
+              <div>
+                <h3 className="mb-2 text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                  Declarado pelo funcionário
+                </h3>
+                <dl className="space-y-1.5 text-sm">
+                  {entrada.label && (
+                    <Linha rotulo="Tipo escolhido">{entrada.label}</Linha>
+                  )}
+                </dl>
+                {entrada.note && (
+                  <p className="mt-2 whitespace-pre-wrap rounded-md bg-zinc-50 px-3 py-2 text-sm dark:bg-zinc-800">
+                    {entrada.note}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <h3 className="mb-2 text-sm font-medium text-zinc-600 dark:text-zinc-400">
                 Evidência
