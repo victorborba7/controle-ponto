@@ -16,11 +16,13 @@ import {
   Th,
   Vazio,
 } from "@/components/ui";
+import { useIdioma } from "@/i18n/contexto";
 import { api, paramsDe } from "@/lib/api";
-import { formatarData, rotuloStatusFuncionario } from "@/lib/format";
 import type { EmployeeSummary, Paginated } from "@/lib/types";
+import { funcionario as rotaFuncionario } from "@/rotas";
 
 export default function FuncionariosPage() {
+  const { t, fmt } = useIdioma();
   const [status, setStatus] = useState("");
   const [dados, setDados] = useState<Paginated<EmployeeSummary> | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -37,11 +39,11 @@ export default function FuncionariosPage() {
         ),
       );
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Falha ao carregar");
+      setErro(e instanceof Error ? e.message : t("func.falhaAoCarregar"));
     } finally {
       setCarregando(false);
     }
-  }, [status]);
+  }, [status, t]);
 
   useEffect(() => {
     void carregar();
@@ -50,37 +52,37 @@ export default function FuncionariosPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Funcionários</h1>
+        <h1 className="text-xl font-semibold">{t("func.titulo")}</h1>
         <div className="flex gap-2">
           <Select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
             className="w-auto"
           >
-            <option value="">Todos</option>
-            <option value="active">Ativos</option>
-            <option value="inactive">Inativos</option>
+            <option value="">{t("geral.todos")}</option>
+            <option value="active">{t("func.ativos")}</option>
+            <option value="inactive">{t("func.inativos")}</option>
           </Select>
-          <Button onClick={() => setCriando(true)}>Cadastrar</Button>
+          <Button onClick={() => setCriando(true)}>{t("func.cadastrar")}</Button>
         </div>
       </div>
 
       {erro && <Alerta>{erro}</Alerta>}
 
-      <Card title={dados ? `${dados.total} cadastrado(s)` : "Funcionários"}>
+      <Card title={dados ? t("func.total", { n: dados.total }) : t("func.titulo")}>
         {carregando ? (
           <Carregando />
         ) : !dados?.items.length ? (
-          <Vazio>Nenhum funcionário cadastrado ainda.</Vazio>
+          <Vazio>{t("func.vazio")}</Vazio>
         ) : (
           <Tabela>
             <thead>
               <tr>
-                <Th>Matrícula</Th>
-                <Th>Nome</Th>
-                <Th>Cargo</Th>
-                <Th>Admissão</Th>
-                <Th>Situação</Th>
+                <Th>{t("func.matricula")}</Th>
+                <Th>{t("func.nome")}</Th>
+                <Th>{t("func.cargo")}</Th>
+                <Th>{t("func.admissao")}</Th>
+                <Th>{t("func.situacao")}</Th>
                 <Th>{""}</Th>
               </tr>
             </thead>
@@ -90,7 +92,7 @@ export default function FuncionariosPage() {
                   <Td className="font-mono text-xs">{funcionario.external_code}</Td>
                   <Td className="font-medium">{funcionario.name}</Td>
                   <Td>{funcionario.job_title ?? "—"}</Td>
-                  <Td>{formatarData(funcionario.hired_at)}</Td>
+                  <Td>{fmt.data(funcionario.hired_at)}</Td>
                   <Td>
                     <Badge
                       className={
@@ -99,15 +101,15 @@ export default function FuncionariosPage() {
                           : "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
                       }
                     >
-                      {rotuloStatusFuncionario[funcionario.status]}
+                      {fmt.situacao(funcionario.status)}
                     </Badge>
                   </Td>
                   <Td>
                     <Link
-                      href={`/funcionarios/${funcionario.id}`}
+                      href={rotaFuncionario(funcionario.id)}
                       className="text-sm text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-300"
                     >
-                      Abrir
+                      {t("func.abrir")}
                     </Link>
                   </Td>
                 </tr>

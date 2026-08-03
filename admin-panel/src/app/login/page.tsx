@@ -4,9 +4,12 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Alerta, Button, Field, Input } from "@/components/ui";
+import { useIdioma } from "@/i18n/contexto";
+import { rotas } from "@/rotas";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useIdioma();
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -30,14 +33,14 @@ export default function LoginPage() {
 
       if (!resposta.ok) {
         const corpo = await resposta.json().catch(() => ({}));
-        setErro(corpo.detail ?? "Não foi possível entrar");
+        setErro(corpo.detail ?? t("login.falhou"));
         return;
       }
 
-      router.push("/pontos");
+      router.push(rotas.pontos);
       router.refresh();
     } catch {
-      setErro("Não foi possível falar com o servidor");
+      setErro(t("login.semServidor"));
     } finally {
       setEnviando(false);
     }
@@ -47,8 +50,8 @@ export default function LoginPage() {
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold">Ponto Facial</h1>
-          <p className="mt-1 text-sm text-zinc-500">Painel administrativo</p>
+          <h1 className="text-2xl font-semibold">{t("app.nome")}</h1>
+          <p className="mt-1 text-sm text-zinc-500">{t("app.painel")}</p>
         </div>
 
         <form
@@ -57,10 +60,7 @@ export default function LoginPage() {
         >
           {erro && <Alerta>{erro}</Alerta>}
 
-          <Field
-            label="Empresa"
-            hint="Código da empresa, informado na implantação"
-          >
+          <Field label={t("login.empresa")} hint={t("login.empresaAjuda")}>
             <Input
               name="tenant_slug"
               required
@@ -70,11 +70,11 @@ export default function LoginPage() {
             />
           </Field>
 
-          <Field label="E-mail">
+          <Field label={t("login.email")}>
             <Input name="email" type="email" required autoComplete="username" />
           </Field>
 
-          <Field label="Senha">
+          <Field label={t("login.senha")}>
             <Input
               name="password"
               type="password"
@@ -84,7 +84,7 @@ export default function LoginPage() {
           </Field>
 
           <Button type="submit" className="w-full" disabled={enviando}>
-            {enviando ? "Entrando…" : "Entrar"}
+            {enviando ? t("login.entrando") : t("login.entrar")}
           </Button>
         </form>
       </div>

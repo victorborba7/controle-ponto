@@ -4,14 +4,19 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { useIdioma } from "@/i18n/contexto";
+import type { Chave } from "@/i18n/dicionario";
 import { api } from "@/lib/api";
 import type { AdminProfile } from "@/lib/types";
+import { rotas } from "@/rotas";
 
-const navegacao = [
-  { href: "/pontos", rotulo: "Pontos" },
-  { href: "/funcionarios", rotulo: "Funcionários" },
-  { href: "/locais", rotulo: "Locais" },
-  { href: "/configuracoes", rotulo: "Configurações" },
+import { SeletorDeIdioma } from "./SeletorDeIdioma";
+
+const navegacao: { href: string; chave: Chave }[] = [
+  { href: rotas.pontos, chave: "nav.pontos" },
+  { href: rotas.funcionarios, chave: "nav.funcionarios" },
+  { href: rotas.locais, chave: "nav.locais" },
+  { href: rotas.configuracoes, chave: "nav.configuracoes" },
 ];
 
 type Sessao = {
@@ -24,6 +29,7 @@ type Sessao = {
 export function Shell({ children }: { children: React.ReactNode }) {
   const caminho = usePathname();
   const router = useRouter();
+  const { t } = useIdioma();
   const [sessao, setSessao] = useState<Sessao | null>(null);
 
   useEffect(() => {
@@ -32,13 +38,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
       .then(setSessao)
       .catch(() => {
         // Sessao caiu enquanto a aba estava aberta.
-        router.push("/login");
+        router.push(rotas.login);
       });
   }, [router]);
 
   async function sair() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+    router.push(rotas.login);
     router.refresh();
   }
 
@@ -46,8 +52,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-8 gap-y-3 px-6 py-3">
-          <Link href="/pontos" className="font-semibold">
-            Ponto Facial
+          <Link href={rotas.pontos} className="font-semibold">
+            {t("app.nome")}
           </Link>
 
           <nav className="flex gap-1">
@@ -63,7 +69,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                       : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800/60"
                   }`}
                 >
-                  {item.rotulo}
+                  {t(item.chave)}
                 </Link>
               );
             })}
@@ -73,11 +79,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
             {sessao && (
               <span className="text-zinc-500 dark:text-zinc-400">{sessao.name}</span>
             )}
+            <SeletorDeIdioma />
             <button
               onClick={sair}
               className="rounded-md px-2 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
             >
-              Sair
+              {t("nav.sair")}
             </button>
           </div>
         </div>

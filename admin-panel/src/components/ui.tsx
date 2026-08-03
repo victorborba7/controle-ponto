@@ -9,6 +9,8 @@
 
 import type { ReactNode } from "react";
 
+import { useIdioma } from "@/i18n/contexto";
+
 export function Card({
   title,
   actions,
@@ -131,7 +133,8 @@ export function Vazio({ children }: { children: ReactNode }) {
 }
 
 export function Carregando() {
-  return <p className="py-10 text-center text-sm text-zinc-500">Carregando…</p>;
+  const { t } = useIdioma();
+  return <p className="py-10 text-center text-sm text-zinc-500">{t("geral.carregando")}</p>;
 }
 
 /** Tabela que rola na horizontal em telas estreitas, sem empurrar a página. */

@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import { cookies } from "next/headers";
+
+import { ProvedorDeIdioma } from "@/i18n/contexto";
+import { dicionario } from "@/i18n/dicionario";
+import { COOKIE_IDIOMA, normalizar } from "@/i18n/idioma";
 
 import "./globals.css";
 
@@ -8,18 +13,27 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
+/**
+ * O título da aba fica em inglês fixo, e não no idioma da sessão.
+ *
+ * `generateMetadata` conseguiria lê-lo do cookie — mas o título é a única
+ * string que existe antes de qualquer sessão, e amarrá-lo ao cookie tornaria
+ * a rota dinâmica só por causa disso. Não compensa.
+ */
 export const metadata: Metadata = {
-  title: "Ponto Facial — Painel",
-  description: "Gestão de funcionários e registros de ponto",
+  title: `${dicionario.en["app.nome"]} — ${dicionario.en["app.painel"]}`,
+  description: dicionario.en["app.descricao"],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const idioma = normalizar((await cookies()).get(COOKIE_IDIOMA)?.value);
+
   return (
-    <html lang="pt-BR" className={`${geistSans.variable} h-full antialiased`}>
+    <html lang={idioma} className={`${geistSans.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
-        {children}
+        <ProvedorDeIdioma idioma={idioma}>{children}</ProvedorDeIdioma>
       </body>
     </html>
   );
