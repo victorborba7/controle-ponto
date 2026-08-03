@@ -123,3 +123,24 @@ export function macsConhecidos(locais: ConfigLocal[]): Set<string> {
   }
   return macs;
 }
+
+/**
+ * UUIDs de iBeacon cadastrados, em maiúsculas.
+ *
+ * Existe por causa do iOS. Lá o iBeacon não chega pelo CoreBluetooth — só pelo
+ * CoreLocation, que **exige saber o UUID de antemão**: não há varredura
+ * genérica de iBeacon no iPhone. Sem esta lista, o app iOS não teria o que
+ * procurar.
+ *
+ * O CoreLocation compara UUID sem diferenciar caixa, mas a API nativa espera a
+ * forma canônica em maiúsculas — normalizar aqui evita depender disso.
+ */
+export function uuidsIBeaconConhecidos(locais: ConfigLocal[]): string[] {
+  const uuids = new Set<string>();
+  for (const local of locais) {
+    for (const beacon of local.beacons) {
+      if (beacon.ibeacon_uuid) uuids.add(beacon.ibeacon_uuid.toUpperCase());
+    }
+  }
+  return Array.from(uuids);
+}

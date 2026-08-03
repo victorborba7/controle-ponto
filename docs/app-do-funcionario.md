@@ -188,14 +188,57 @@ link do Play Store.
 
 ## iOS (Etapa 9b)
 
-O mesmo código roda no iPhone, mas depende de:
+### O que muda em relação ao Android
 
-1. Conta Apple Developer paga (US$ 99/ano) — **compre só depois de validar o
-   Android**, e comece o cadastro no mesmo dia, porque a aprovação leva dias
-2. `eas build --profile preview --platform ios` (compila na nuvem, sem Mac)
+| Identificador | Android | iPhone |
+|---|---|---|
+| **Eddystone** | `react-native-ble-plx` | `react-native-ble-plx` — é anúncio BLE comum |
+| **iBeacon** | `react-native-ble-plx` | **CoreLocation**, via `expo-beacon` |
+| **Endereço MAC** | funciona | **impossível** |
+
+O iOS **não entrega anúncio de iBeacon pelo CoreBluetooth**. A Apple os reservou
+ao CoreLocation, e a consequência prática molda o código: o CoreLocation não faz
+varredura genérica. Ele não responde "que iBeacons existem por perto?", só "o
+beacon de UUID X está perto?".
+
+Por isso o app procura apenas os UUIDs **já cadastrados**, que ele conhece do
+cache de `configLocal`. Um beacon novo só aparece no iPhone depois de cadastrado
+no painel **e** de o app ter sincronizado a configuração ao menos uma vez com
+conexão.
+
+O endereço MAC não funciona de forma alguma: no iPhone, o `id` de um periférico
+BLE é um identificador rotativo por app, não o endereço do rádio. O painel avisa
+quando um local só tem beacons cadastrados por MAC.
+
+### Passos
+
+1. Conta Apple Developer paga (US$ 99/ano) — sem ela **não há como instalar
+   nada em iPhone**, nem por TestFlight nem por Ad Hoc
+2. `eas build --profile development --platform ios`
 3. `eas submit --platform ios` para o TestFlight
-4. Validar a varredura Eddystone em iPhone físico — é o ponto que motivou a
-   escolha do formato, e o único que não dá para verificar antes
+4. Validar com beacon físico
+
+> **`simulator: false` é de propósito.** O simulador do iOS não tem Bluetooth —
+> um build de simulador não serve para testar beacon nenhum.
+
+### Riscos conhecidos desta etapa
+
+**Nada disto foi verificado em iPhone.** O `expo prebuild --platform ios`
+**recusa rodar no Windows** — o projeto iOS só é gerado em macOS ou Linux, o que
+inclui o EAS Build. Localmente dá para conferir o `Info.plist` resultante com
+`npx expo config --type introspect`, e é o que foi feito; o resto só a primeira
+instalação prova.
+
+**`expo-beacon` não é validado na New Architecture**, que é o padrão do SDK 57 —
+o `expo-doctor` aponta isso, e o aviso foi deixado visível de propósito. O
+pacote também é novo e de pouca adoção (1.777 downloads/mês, nenhuma estrela).
+Está isolado atrás de `src/services/ibeaconIos.ts`: se ele falhar, o que muda é
+aquele arquivo, e o resto do app não fica sabendo.
+
+**A ordem dos plugins no `app.json` importa, e ao contrário do que parece.** Os
+mods do Expo executam na ordem **inversa** do registro: o primeiro da lista roda
+por último. `./plugins/withVarreduraDeBeacon` está em primeiro justamente por
+isso — ele desfaz o que os outros fizeram (ver o cabeçalho do arquivo).
 
 A entitlement de leitura de Wi-Fi já está declarada no `app.json`, mas só passa
 a valer com a conta paga.

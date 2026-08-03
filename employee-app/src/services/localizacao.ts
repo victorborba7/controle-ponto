@@ -13,11 +13,17 @@
 
 import NetInfo from "@react-native-community/netinfo";
 import * as Location from "expo-location";
+import { Platform } from "react-native";
 import { BleManager, State as BleState, ScanMode } from "react-native-ble-plx";
 
-import { macsConhecidos, sincronizarConfig } from "./configLocal";
+import {
+  macsConhecidos,
+  sincronizarConfig,
+  uuidsIBeaconConhecidos,
+} from "./configLocal";
 import { consolidar, lerEddystone, type LeituraEddystone } from "./eddystone";
 import { consolidarIBeacons, lerIBeacon, type LeituraIBeacon } from "./ibeacon";
+import { varrerIBeaconsIos } from "./ibeaconIos";
 import { garantirPermissoesBluetooth } from "./permissoes";
 
 /** Tempo de varredura BLE. Curto o bastante para não irritar, longo o bastante
@@ -303,7 +309,23 @@ export async function coletarSinais(
   const locais = await sincronizarConfig();
 
   aoProgredir?.({ etapa: "bluetooth", detalhe: "Procurando beacons do local…" });
-  const beacons = await coletarBeacons(avisos, macsConhecidos(locais));
+
+  // No iPhone o `device.id` do BLE é um identificador rotativo por app, não o
+  // endereço do rádio. Passar a lista de MACs conhecidos ali não filtraria
+  // nada — só criaria a chance de um identificador alheio coincidir. Por isso
+  // o conjunto vai vazio, e o bloco abaixo nunca relata MAC no iOS.
+  const beacons = await coletarBeacons(
+    avisos,
+    Platform.OS === "ios" ? new Set<string>() : macsConhecidos(locais),
+  );
+
+  // O iOS não entrega iBeacon pelo CoreBluetooth; a varredura acima traz
+  // Eddystone, e os iBeacons vêm do CoreLocation, procurados por UUID.
+  const iosIBeacons = await varrerIBeaconsIos(
+    uuidsIBeaconConhecidos(locais),
+    TIMEOUT_BLE_MS,
+  );
+  if (iosIBeacons.aviso) avisos.push(iosIBeacons.aviso);
 
   aoProgredir?.({ etapa: "wifi", detalhe: "Verificando a rede Wi-Fi…" });
   const wifi = await coletarWifi(avisos);
@@ -321,7 +343,10 @@ export async function coletarSinais(
       eddystone_instance: b.instance,
       rssi: b.rssi,
     })),
-    ...beacons.ibeacon.map((b) => ({
+    // Android e iOS chegam aqui pela mesma forma, por caminhos diferentes:
+    // `beacons.ibeacon` vem do BLE cru (Android) e `iosIBeacons` do
+    // CoreLocation. Um dos dois está sempre vazio.
+    ...[...beacons.ibeacon, ...iosIBeacons.leituras].map((b) => ({
       protocol: "ibeacon" as const,
       ibeacon_uuid: b.uuid,
       ibeacon_major: b.major,

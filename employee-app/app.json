@@ -46,6 +46,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "./plugins/withVarreduraDeBeacon",
       "expo-secure-store",
       "expo-dev-client",
       [
@@ -58,7 +59,11 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "A localização confirma que você está no local de trabalho ao bater o ponto."
+          "locationWhenInUsePermission": "A localização confirma que você está no local de trabalho ao bater o ponto.",
+          "locationAlwaysPermission": "A localização confirma que você está no local de trabalho ao bater o ponto.",
+          "locationAlwaysAndWhenInUsePermission": "A localização confirma que você está no local de trabalho ao bater o ponto.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
         }
       ],
       [
@@ -77,7 +82,17 @@
           }
         }
       ],
-      "./plugins/withVarreduraDeBeacon"
+      [
+        "expo-beacon",
+        {
+          "ios": {
+            "backgroundGeolocation": false,
+            "locationWhenInUsePermission": "A localização confirma que você está no local de trabalho ao bater o ponto.",
+            "locationAlwaysPermission": "A localização confirma que você está no local de trabalho ao bater o ponto.",
+            "bluetoothPermission": "O Bluetooth detecta os beacons instalados no local de trabalho para confirmar sua presença."
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {

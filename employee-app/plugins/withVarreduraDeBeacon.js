@@ -40,9 +40,41 @@
  * resultados de varredura. Ver `src/services/permissoes.ts`.
  */
 
-const { AndroidConfig, withAndroidManifest } = require("expo/config-plugins");
+const {
+  AndroidConfig,
+  withAndroidManifest,
+  withInfoPlist,
+} = require("expo/config-plugins");
 
 const BLUETOOTH_SCAN = "android.permission.BLUETOOTH_SCAN";
+
+/**
+ * Modos de segundo plano que este app **não** usa.
+ *
+ * O `expo-beacon` acrescenta `location` e `bluetooth-central` ao
+ * `UIBackgroundModes` de forma incondicional — a opção `backgroundGeolocation`
+ * do plugin dele não desliga isso, e não há como optar por fora.
+ *
+ * Aqui o beacon só é procurado quando o funcionário toca em "Registrar ponto",
+ * com o app aberto. Declarar segundo plano que não se usa é motivo conhecido
+ * de recusa na revisão da App Store, e pede ao usuário mais acesso do que o
+ * app precisa — num produto que já trata biometria, esse é o tipo de excesso
+ * que custa caro.
+ *
+ * Se um dia existir "ponto automático ao entrar no hangar", isto sai daqui de
+ * forma deliberada, junto com o código que justifica o modo.
+ */
+const MODOS_NAO_USADOS = ["location", "bluetooth-central"];
+
+/** Textos que as bibliotecas deixam em inglês e apareceriam no diálogo do iOS. */
+const TEXTOS_EM_PORTUGUES = {
+  NSMicrophoneUsageDescription:
+    "O microfone não é usado para bater ponto; o acesso é pedido pela câmera do sistema.",
+  NSFaceIDUsageDescription:
+    "O Face ID protege as credenciais de acesso guardadas neste aparelho.",
+  NSMotionUsageDescription:
+    "Os sensores de movimento não são usados para bater ponto.",
+};
 
 /** Exportada para teste: opera sobre o manifesto já lido. */
 function removerNeverForLocation(androidManifest) {
@@ -66,11 +98,55 @@ function removerNeverForLocation(androidManifest) {
   return androidManifest;
 }
 
-const withVarreduraDeBeacon = (config) =>
-  withAndroidManifest(config, (config) => {
-    config.modResults = removerNeverForLocation(config.modResults);
-    return config;
+/** Exportada para teste: opera sobre o Info.plist já lido. */
+function ajustarInfoPlist(infoPlist) {
+  const modos = Array.isArray(infoPlist.UIBackgroundModes)
+    ? infoPlist.UIBackgroundModes.filter((m) => !MODOS_NAO_USADOS.includes(m))
+    : [];
+
+  // Chave vazia é pior que chave ausente: o revisor vê a declaração e pergunta
+  // por que ela está lá.
+  if (modos.length > 0) infoPlist.UIBackgroundModes = modos;
+  else delete infoPlist.UIBackgroundModes;
+
+  // Só substitui o que ainda está no texto padrão em inglês — se alguém
+  // escrever um texto próprio no app.json, ele vence.
+  for (const [chave, texto] of Object.entries(TEXTOS_EM_PORTUGUES)) {
+    const atual = infoPlist[chave];
+    if (typeof atual === "string" && atual.startsWith("Allow $(PRODUCT_NAME)")) {
+      infoPlist[chave] = texto;
+    }
+  }
+
+  return infoPlist;
+}
+
+/**
+ * Precisa ser o **primeiro** plugin da lista do `app.json`.
+ *
+ * Não é engano: **os mods do Expo executam na ordem inversa do registro.**
+ * Cada `withInfoPlist` embrulha o anterior, então o último registrado roda
+ * primeiro, e o primeiro registrado roda por último. Este plugin desfaz coisas
+ * que os outros fizeram — os modos de segundo plano vêm do `expo-beacon`, os
+ * textos em inglês vêm do `expo-camera`, do `expo-location` e do
+ * `expo-secure-store` — e precisa ser o último a rodar para que os ajustes não
+ * sejam sobrescritos.
+ *
+ * Verificado por medição, não por dedução: com o plugin em último lugar na
+ * lista, o `UIBackgroundModes` voltava; em primeiro, some.
+ */
+const withVarreduraDeBeacon = (config) => {
+  config = withAndroidManifest(config, (cfg) => {
+    cfg.modResults = removerNeverForLocation(cfg.modResults);
+    return cfg;
   });
+
+  return withInfoPlist(config, (cfg) => {
+    cfg.modResults = ajustarInfoPlist(cfg.modResults);
+    return cfg;
+  });
+};
 
 module.exports = withVarreduraDeBeacon;
 module.exports.removerNeverForLocation = removerNeverForLocation;
+module.exports.ajustarInfoPlist = ajustarInfoPlist;

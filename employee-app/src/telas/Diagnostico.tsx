@@ -1,6 +1,6 @@
 import * as Clipboard from "expo-clipboard";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import {
   coletarSinais,
@@ -150,6 +150,21 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
             que aparecerem são os que devem ser cadastrados no painel.
           </Legenda>
         </View>
+
+        {/* Sem isto, um iPhone parece quebrado: a varredura crua nunca mostra
+            iBeacon, e quem não souber por quê vai procurar defeito onde não há. */}
+        {Platform.OS === "ios" && (
+          <Aviso tipo="info">
+            No iPhone, a varredura crua <Text style={{ fontWeight: "700" }}>não
+            mostra iBeacons</Text> — o iOS os reserva ao CoreLocation e não os
+            entrega a nenhum app pela via do Bluetooth. Eles aparecem só na
+            seção Beacons, e apenas os que já estão cadastrados: o iPhone não
+            faz varredura genérica de iBeacon, precisa do UUID de antemão.
+            {"\n\n"}
+            Cadastro por endereço MAC não funciona aqui de forma alguma — o iOS
+            não expõe o endereço do rádio a app nenhum.
+          </Aviso>
+        )}
 
         <Botao
           titulo={etapa ?? "Varrer sinais"}

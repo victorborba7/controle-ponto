@@ -224,10 +224,12 @@ export default function LocalPage() {
           </div>
 
           {protocolo === "ibeacon" && (
-            <p className="text-xs text-amber-700 dark:text-amber-400">
-              iBeacon é lido no Android, mas não no iPhone — o iOS só entrega
-              esses anúncios via CoreLocation. Se houver iPhone na equipe, prefira
-              um beacon que também transmita Eddystone.
+            <p className="text-xs text-zinc-500">
+              Funciona nos dois sistemas. No iPhone a leitura passa pelo
+              CoreLocation, que só procura UUIDs conhecidos de antemão — por
+              isso o beacon precisa estar cadastrado <strong>antes</strong> de o
+              funcionário tentar bater o ponto, e o app precisa ter sincronizado
+              a configuração ao menos uma vez com conexão.
             </p>
           )}
 
@@ -249,6 +251,22 @@ export default function LocalPage() {
           </div>
         </form>
 
+        {/* Um local só com beacons por MAC é um local em que ninguém com
+            iPhone consegue validar presença por beacon — cai direto para
+            Wi-Fi ou GPS. Melhor descobrir aqui do que no hangar. */}
+        {beacons.some((b) => b.is_active) &&
+          beacons.every((b) => !b.is_active || b.protocol === "mac") && (
+            <div className="mb-4">
+              <Alerta tipo="aviso">
+                Todos os beacons ativos deste local são identificados por{" "}
+                <strong>endereço MAC</strong>, que o iPhone não consegue ler.
+                Funcionários com iPhone vão cair para Wi-Fi ou GPS aqui.
+                Cadastre também por iBeacon ou Eddystone para cobrir os dois
+                sistemas.
+              </Alerta>
+            </div>
+          )}
+
         {!beacons.length ? (
           <Vazio>Nenhum beacon cadastrado neste local.</Vazio>
         ) : (
@@ -266,10 +284,12 @@ export default function LocalPage() {
               {beacons.map((beacon) => (
                 <tr key={beacon.id}>
                   <Td className="font-medium">{beacon.label}</Td>
+                  {/* O switch é exaustivo de propósito: um protocolo novo passa
+                      a dar erro de compilação aqui em vez de aparecer como
+                      "null null:null" na tela do RH — que foi o que acontecia
+                      com os beacons cadastrados por MAC. */}
                   <Td className="font-mono text-xs">
-                    {beacon.protocol === "eddystone"
-                      ? `${beacon.eddystone_namespace} / ${beacon.eddystone_instance}`
-                      : `${beacon.ibeacon_uuid} ${beacon.ibeacon_major}:${beacon.ibeacon_minor}`}
+                    {identificadorDoBeacon(beacon)}
                   </Td>
                   <Td>{beacon.min_rssi} dBm</Td>
                   <Td>
@@ -355,4 +375,21 @@ export default function LocalPage() {
       </Card>
     </div>
   );
+}
+
+/**
+ * Como cada protocolo se identifica na tabela.
+ *
+ * `switch` exaustivo sobre `BeaconProtocol`: acrescentar um protocolo passa a
+ * quebrar a compilação aqui, em vez de aparecer em branco na tela do RH.
+ */
+function identificadorDoBeacon(beacon: Beacon): string {
+  switch (beacon.protocol) {
+    case "eddystone":
+      return `${beacon.eddystone_namespace} / ${beacon.eddystone_instance}`;
+    case "ibeacon":
+      return `${beacon.ibeacon_uuid} ${beacon.ibeacon_major}:${beacon.ibeacon_minor}`;
+    case "mac":
+      return beacon.mac_address ?? "—";
+  }
 }
