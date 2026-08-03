@@ -5,8 +5,10 @@ e nao contra SQLite: o schema depende de pgvector e JSONB, entao um banco
 substituto testaria algo diferente do que vai para producao.
 """
 
+import json
 import uuid
 from collections.abc import AsyncGenerator
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -26,7 +28,7 @@ from app.core.security import hash_password
 from app.db.base import Base
 from app.db.session import get_session
 from app.facial.runner import AsyncFaceEngine
-from app.facial.stub import StubFaceEngine
+from app.facial.stub import StubFaceEngine, stub_image, stub_image_variant
 from app.main import app
 from app.models import Employee, Site, Tenant, User
 from app.models.enums import UserRole
@@ -230,3 +232,160 @@ async def login_admin(
 
 def auth_header(tokens: dict) -> dict[str, str]:
     return {"Authorization": f"Bearer {tokens['access_token']}"}
+
+
+# --------------------------------------------------------------------------
+# Cenario de batida de ponto
+#
+# Mora aqui, e nao no modulo de teste que o usa mais, porque ja e usado por
+# mais de um. Importar fixture de um test_*.py para outro funciona no pytest,
+# mas faz o nome ser redefinido em cada assinatura de teste — o que enche o
+# lint de F811 e esconde uma redefinicao de verdade no meio do ruido.
+# --------------------------------------------------------------------------
+
+FUNCIONARIO = (200, 30, 30)
+OUTRA_PESSOA = (30, 30, 200)
+
+NAMESPACE = "edd1ebeac04e5defa017"
+INSTANCE = "000000000001"
+BSSID = "a4:2b:8c:00:11:22"
+
+HANGAR_LAT, HANGAR_LON = -23.4356, -46.4731
+
+SEM_SINAL = json.dumps({})
+
+
+@pytest.fixture
+async def cenario(client: AsyncClient, db: AsyncSession) -> dict:
+    """Empresa, local, beacon, wifi e funcionario com rosto cadastrado."""
+    tenant = await create_tenant(db, slug="acme")
+    await create_admin(db, tenant, email="rh@acme.com")
+    funcionario = await create_employee(db, tenant, external_code="0001", name="Joao")
+    await db.commit()
+
+    admin = auth_header((await login_admin(client, tenant, "rh@acme.com"))["tokens"])
+
+    site = (
+        await client.post(
+            "/api/v1/sites",
+            headers=admin,
+            json={
+                "name": "Hangar",
+                "latitude": HANGAR_LAT,
+                "longitude": HANGAR_LON,
+                "geofence_radius_m": 200,
+            },
+        )
+    ).json()
+
+    await client.post(
+        f"/api/v1/sites/{site['id']}/beacons",
+        headers=admin,
+        json={
+            "label": "Portao A",
+            "protocol": "eddystone",
+            "eddystone_namespace": NAMESPACE,
+            "eddystone_instance": INSTANCE,
+            "min_rssi": -75,
+        },
+    )
+    await client.post(
+        f"/api/v1/sites/{site['id']}/wifi-networks",
+        headers=admin,
+        json={"ssid": "Acme-Corp", "bssid": BSSID},
+    )
+
+    enrollment = await client.post(
+        f"/api/v1/employees/{funcionario.id}/face-templates",
+        headers=admin,
+        files=[
+            ("images", ("f1.png", stub_image(FUNCIONARIO), "image/png")),
+            ("images", ("f2.png", stub_image_variant(FUNCIONARIO, shift=4), "image/png")),
+            ("images", ("f3.png", stub_image_variant(FUNCIONARIO, shift=8), "image/png")),
+        ],
+        data={"consent_policy_version": "2026.1", "consent_granted": "true"},
+    )
+    assert enrollment.status_code == 201, enrollment.text
+
+    login = await client.post(
+        "/api/v1/auth/employee/login",
+        json={
+            "tenant_slug": "acme",
+            "external_code": "0001",
+            "password": TEST_PASSWORD,
+            "device": device_payload("celular-do-joao"),
+        },
+    )
+
+    return {
+        "tenant": tenant,
+        "funcionario": funcionario,
+        "site": site,
+        "admin": admin,
+        "app": auth_header(login.json()["tokens"]),
+        "device_id": login.json()["device_id"],
+    }
+
+
+def com_beacon(rssi: int = -55) -> str:
+    return json.dumps(
+        {
+            "beacons": [
+                {
+                    "protocol": "eddystone",
+                    "eddystone_namespace": NAMESPACE,
+                    "eddystone_instance": INSTANCE,
+                    "rssi": rssi,
+                }
+            ]
+        }
+    )
+
+
+def com_wifi(bssid: str | None = BSSID) -> str:
+    return json.dumps({"wifi": [{"ssid": "Acme-Corp", "bssid": bssid}]})
+
+
+def com_gps(metros_do_centro: float = 50, accuracy: float = 15) -> str:
+    return json.dumps(
+        {
+            "gps": {
+                "latitude": HANGAR_LAT + metros_do_centro / 111_320.0,
+                "longitude": HANGAR_LON,
+                "accuracy_m": accuracy,
+            }
+        }
+    )
+
+
+async def bater_ponto(
+    client: AsyncClient,
+    cenario: dict,
+    *,
+    evidence: str | None = None,
+    cor: tuple[int, int, int] = FUNCIONARIO,
+    entry_type: str | None = None,
+    label: str | None = None,
+    note: str | None = None,
+    idempotency_key: str | None = None,
+    client_recorded_at: datetime | None = None,
+    headers: dict | None = None,
+):
+    data: dict[str, str] = {"evidence": evidence if evidence is not None else com_beacon()}
+    if entry_type:
+        data["entry_type"] = entry_type
+    if label is not None:
+        data["label"] = label
+    if note is not None:
+        data["note"] = note
+    if idempotency_key:
+        data["idempotency_key"] = idempotency_key
+    if client_recorded_at:
+        data["client_recorded_at"] = client_recorded_at.isoformat()
+
+    return await client.post(
+        "/api/v1/time-entries",
+        headers=headers or cenario["app"],
+        files={"selfie": ("selfie.png", stub_image(cor), "image/png")},
+        data=data,
+    )

@@ -26,6 +26,7 @@ from app.models import Device, Employee, FaceTemplate, TimeEntry
 from app.models.enums import EntryType, LocationMethod, TimeEntryStatus
 from app.schemas.evidence import LocationEvidence
 from app.services import enrollment as enrollment_service
+from app.services import punch_config as punch_config_service
 from app.services.location import load_registry
 from app.services.location_validator import (
     build_audit_payload,
@@ -85,6 +86,8 @@ async def punch(
     selfie: bytes,
     evidence: LocationEvidence,
     entry_type: EntryType | None = None,
+    label: str | None = None,
+    note: str | None = None,
     idempotency_key: str | None = None,
     client_recorded_at: datetime | None = None,
 ) -> PunchResult:
@@ -109,10 +112,18 @@ async def punch(
 
     _ensure_device_trusted(employee, device)
 
+    # Antes do rosto e da localizacao: campo obrigatorio faltando e recusa
+    # barata, e recusar depois do processamento gastaria a inferencia facial
+    # para dizer "escreva uma observacao".
+    config = await punch_config_service.load(session, repo)
+    declarado = punch_config_service.resolve(config, label=label, note=note)
+
     ultimo = await _last_entry(repo, employee)
     _ensure_not_too_soon(ultimo, now)
 
-    tipo = entry_type or _deduce_entry_type(ultimo)
+    # Precedencia: o que o chamador impos, depois o tipo que o rotulo escolhido
+    # carrega, e so entao a alternancia automatica.
+    tipo = entry_type or declarado.entry_type or _deduce_entry_type(ultimo)
 
     # --- Rosto ---
     templates = await enrollment_service.load_active_templates(session, employee)
@@ -162,6 +173,8 @@ async def punch(
         employee_id=employee.id,
         device_id=device.id if device else None,
         entry_type=tipo,
+        label=declarado.label,
+        note=declarado.note,
         # Horario do servidor: e o que vale juridicamente. O do aparelho fica
         # gravado ao lado, e a divergencia entre os dois ja entrou na decisao.
         recorded_at=now,

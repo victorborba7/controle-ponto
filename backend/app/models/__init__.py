@@ -15,13 +15,21 @@ from app.models.enums import (
     DevicePlatform,
     EmployeeStatus,
     EntryType,
+    LabelMode,
     LocationMethod,
+    NoteMode,
     SubjectType,
     TimeEntryStatus,
     UserRole,
 )
 from app.models.face_template import EMBEDDING_DIM, FaceTemplate
 from app.models.location import Beacon, Site, WifiNetwork
+from app.models.punch_config import (
+    LABEL_MAX_LENGTH,
+    NOTE_MAX_LENGTH,
+    PunchConfig,
+    PunchLabel,
+)
 from app.models.refresh_token import RefreshToken
 from app.models.tenant import Tenant
 from app.models.time_entry import TimeEntry
@@ -29,6 +37,8 @@ from app.models.user import User
 
 __all__ = [
     "EMBEDDING_DIM",
+    "LABEL_MAX_LENGTH",
+    "NOTE_MAX_LENGTH",
     "AuditAction",
     "AuditLog",
     "Base",
@@ -42,7 +52,11 @@ __all__ = [
     "EmployeeStatus",
     "EntryType",
     "FaceTemplate",
+    "LabelMode",
     "LocationMethod",
+    "NoteMode",
+    "PunchConfig",
+    "PunchLabel",
     "RefreshToken",
     "Site",
     "SubjectType",

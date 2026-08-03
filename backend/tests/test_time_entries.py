@@ -15,170 +15,27 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.facial.stub import stub_image, stub_image_variant
 from app.models import AuditLog, TimeEntry
 from app.models.enums import EntryType, LocationMethod, TimeEntryStatus
 from tests.conftest import (
+    HANGAR_LAT,
+    HANGAR_LON,
+    INSTANCE,
+    NAMESPACE,
+    OUTRA_PESSOA,
+    SEM_SINAL,
     TEST_PASSWORD,
     auth_header,
+    bater_ponto,
+    com_beacon,
+    com_gps,
+    com_wifi,
     create_admin,
     create_employee,
     create_tenant,
     device_payload,
     login_admin,
 )
-
-FUNCIONARIO = (200, 30, 30)
-OUTRA_PESSOA = (30, 30, 200)
-
-NAMESPACE = "edd1ebeac04e5defa017"
-INSTANCE = "000000000001"
-BSSID = "a4:2b:8c:00:11:22"
-
-HANGAR_LAT, HANGAR_LON = -23.4356, -46.4731
-
-
-# --------------------------------------------------------------------------
-# Cenario completo: empresa, local, beacon, wifi, funcionario com rosto
-# --------------------------------------------------------------------------
-
-
-@pytest.fixture
-async def cenario(client: AsyncClient, db: AsyncSession) -> dict:
-    tenant = await create_tenant(db, slug="acme")
-    await create_admin(db, tenant, email="rh@acme.com")
-    funcionario = await create_employee(db, tenant, external_code="0001", name="Joao")
-    await db.commit()
-
-    admin = auth_header((await login_admin(client, tenant, "rh@acme.com"))["tokens"])
-
-    site = (
-        await client.post(
-            "/api/v1/sites",
-            headers=admin,
-            json={
-                "name": "Hangar",
-                "latitude": HANGAR_LAT,
-                "longitude": HANGAR_LON,
-                "geofence_radius_m": 200,
-            },
-        )
-    ).json()
-
-    await client.post(
-        f"/api/v1/sites/{site['id']}/beacons",
-        headers=admin,
-        json={
-            "label": "Portao A",
-            "protocol": "eddystone",
-            "eddystone_namespace": NAMESPACE,
-            "eddystone_instance": INSTANCE,
-            "min_rssi": -75,
-        },
-    )
-    await client.post(
-        f"/api/v1/sites/{site['id']}/wifi-networks",
-        headers=admin,
-        json={"ssid": "Acme-Corp", "bssid": BSSID},
-    )
-
-    enrollment = await client.post(
-        f"/api/v1/employees/{funcionario.id}/face-templates",
-        headers=admin,
-        files=[
-            ("images", ("f1.png", stub_image(FUNCIONARIO), "image/png")),
-            ("images", ("f2.png", stub_image_variant(FUNCIONARIO, shift=4), "image/png")),
-            ("images", ("f3.png", stub_image_variant(FUNCIONARIO, shift=8), "image/png")),
-        ],
-        data={"consent_policy_version": "2026.1", "consent_granted": "true"},
-    )
-    assert enrollment.status_code == 201, enrollment.text
-
-    login = await client.post(
-        "/api/v1/auth/employee/login",
-        json={
-            "tenant_slug": "acme",
-            "external_code": "0001",
-            "password": TEST_PASSWORD,
-            "device": device_payload("celular-do-joao"),
-        },
-    )
-
-    return {
-        "tenant": tenant,
-        "funcionario": funcionario,
-        "site": site,
-        "admin": admin,
-        "app": auth_header(login.json()["tokens"]),
-        "device_id": login.json()["device_id"],
-    }
-
-
-# --------------------------------------------------------------------------
-# Evidencias
-# --------------------------------------------------------------------------
-
-
-def com_beacon(rssi: int = -55) -> str:
-    return json.dumps(
-        {
-            "beacons": [
-                {
-                    "protocol": "eddystone",
-                    "eddystone_namespace": NAMESPACE,
-                    "eddystone_instance": INSTANCE,
-                    "rssi": rssi,
-                }
-            ]
-        }
-    )
-
-
-def com_wifi(bssid: str | None = BSSID) -> str:
-    return json.dumps({"wifi": [{"ssid": "Acme-Corp", "bssid": bssid}]})
-
-
-def com_gps(metros_do_centro: float = 50, accuracy: float = 15) -> str:
-    return json.dumps(
-        {
-            "gps": {
-                "latitude": HANGAR_LAT + metros_do_centro / 111_320.0,
-                "longitude": HANGAR_LON,
-                "accuracy_m": accuracy,
-            }
-        }
-    )
-
-
-SEM_SINAL = json.dumps({})
-
-
-async def bater_ponto(
-    client: AsyncClient,
-    cenario: dict,
-    *,
-    evidence: str = None,
-    cor: tuple[int, int, int] = FUNCIONARIO,
-    entry_type: str | None = None,
-    idempotency_key: str | None = None,
-    client_recorded_at: datetime | None = None,
-    headers: dict | None = None,
-):
-    data: dict[str, str] = {"evidence": evidence if evidence is not None else com_beacon()}
-    if entry_type:
-        data["entry_type"] = entry_type
-    if idempotency_key:
-        data["idempotency_key"] = idempotency_key
-    if client_recorded_at:
-        data["client_recorded_at"] = client_recorded_at.isoformat()
-
-    return await client.post(
-        "/api/v1/time-entries",
-        headers=headers or cenario["app"],
-        files={"selfie": ("selfie.png", stub_image(cor), "image/png")},
-        data=data,
-    )
-
 
 # --------------------------------------------------------------------------
 # O criterio de pronto: os quatro metodos de localizacao

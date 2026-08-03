@@ -67,6 +67,15 @@ class TimeEntry(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
         DateTime(timezone=True), nullable=True
     )
 
+    # --- O que o funcionario declarou (ver PunchConfig) ---
+    # Ambos guardados como texto, e nao como referencia ao cadastro do RH.
+    # Um ponto e evidencia: se o RH renomear ou apagar a opcao "Inicio do
+    # almoco" no ano que vem, o registro tem de continuar dizendo o que estava
+    # escrito na tela quando a pessoa tocou nele. O `entry_type` acima e o que
+    # sustenta a soma de horas; estes dois descrevem.
+    label: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # --- Evidencia facial ---
     face_match_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     matched_face_template_id: Mapped[uuid.UUID | None] = mapped_column(

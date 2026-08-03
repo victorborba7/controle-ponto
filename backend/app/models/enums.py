@@ -46,6 +46,36 @@ class EntryType(StrEnum):
     BREAK_END = "break_end"
 
 
+class NoteMode(StrEnum):
+    """Se o funcionario escreve uma observacao ao bater o ponto.
+
+    Existe porque empresas diferentes querem coisas diferentes do mesmo gesto:
+    uma quer justificativa de atraso, outra quer o numero da ordem de servico,
+    e a maioria nao quer campo nenhum atrapalhando quem so quer bater e entrar.
+    """
+
+    HIDDEN = "hidden"
+    OPTIONAL = "optional"
+    REQUIRED = "required"
+
+
+class LabelMode(StrEnum):
+    """Como o funcionario nomeia a batida, alem do tipo entrada/saida.
+
+    - HIDDEN: so entrada e saida, deduzidas. E o comportamento historico.
+    - FREE: o funcionario digita um nome. O tipo continua sendo deduzido — o
+      texto descreve, nao decide.
+    - LIST: o funcionario escolhe entre opcoes que o RH cadastrou, e **cada
+      opcao carrega o tipo**. E o unico modo em que a escolha do funcionario
+      muda a contagem de horas, e por isso o unico em que o RH controla as
+      alternativas.
+    """
+
+    HIDDEN = "hidden"
+    FREE = "free"
+    LIST = "list"
+
+
 class LocationMethod(StrEnum):
     """Qual elo da cadeia de fallback validou a presenca.
 

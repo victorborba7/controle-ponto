@@ -41,6 +41,7 @@ from app.models.enums import (
     TimeEntryStatus,
     UserRole,
 )
+from app.models.punch_config import NOTE_MAX_LENGTH
 from app.schemas.evidence import LocationEvidence
 from app.schemas.time_entry import (
     MyTimeEntryList,
@@ -51,6 +52,7 @@ from app.schemas.time_entry import (
     TimeEntryWithEmployee,
 )
 from app.services import audit
+from app.services import punch_config as punch_config_service
 from app.services import time_entry as service
 
 router = APIRouter(prefix="/time-entries", tags=["ponto"])
@@ -99,6 +101,19 @@ async def punch(
         default=None,
         description="Entrada ou saida. Se omitido, e deduzido da ultima batida.",
     ),
+    label: str | None = Form(
+        default=None,
+        max_length=60,
+        description=(
+            "Nome da batida escolhido pelo funcionario. Aceito conforme a "
+            "configuracao da empresa; no modo de lista, define o entry_type."
+        ),
+    ),
+    note: str | None = Form(
+        default=None,
+        max_length=NOTE_MAX_LENGTH,
+        description="Observacao do funcionario, quando a empresa a pede",
+    ),
     idempotency_key: str | None = Form(
         default=None,
         max_length=80,
@@ -143,6 +158,8 @@ async def punch(
             selfie=selfie_bytes,
             evidence=parsed_evidence,
             entry_type=entry_type,
+            label=label,
+            note=note,
             idempotency_key=idempotency_key,
             client_recorded_at=client_recorded_at,
         )
@@ -159,6 +176,12 @@ async def punch(
             ip_address=_client_ip(request),
         )
         await session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.user_message
+        ) from exc
+    except punch_config_service.PunchInputError as exc:
+        # Recusa barata: nada foi processado e nada foi gravado. O texto vai
+        # direto para a tela de quem esta com o celular na mao.
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.user_message
         ) from exc

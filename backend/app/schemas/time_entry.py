@@ -26,6 +26,12 @@ class TimeEntrySummary(BaseModel):
     recorded_at: datetime
     client_recorded_at: datetime | None = None
 
+    # O que o funcionario declarou, conforme a configuracao da empresa. Sao
+    # texto congelado no momento da batida: renomear a opcao no cadastro nao
+    # reescreve o que ja aconteceu.
+    label: str | None = None
+    note: str | None = None
+
     status: TimeEntryStatus
     decision_reason: str | None = None
 
