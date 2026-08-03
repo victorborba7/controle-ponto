@@ -3,7 +3,7 @@
 > Documento de execução. O "o quê" e o "porquê" estão em [CLAUDE.MD](CLAUDE.MD).
 > Aqui está o **como** e em **que ordem**.
 
-**Status geral:** `Etapas 0 a 9 implementadas — Etapa 9 aguarda validação em Android físico`
+**Status geral:** `Etapas 0 a 9 concluídas e validadas em Android físico (beacon Aruba ARBT0100). Etapa 9c (configuração de batida) concluída. Próximas: 9b (iOS), 10 (liveness), 11 (LGPD), 12 (deploy).`
 **Última atualização:** 2026-07-30
 
 ---
@@ -37,6 +37,9 @@
 | D7 | **SQLAlchemy 2.0 async + Alembic + asyncpg** | Padrão atual do ecossistema FastAPI, migrações versionadas desde o começo. |
 | D8 | **Beacons Eddystone**, não iBeacon | Eddystone é advertisement BLE comum (service UUID `0xFEAA`, namespace 10 bytes + instance 6 bytes). Como não recebe tratamento especial do iOS, `react-native-ble-plx` lê nos dois sistemas — uma biblioteca só, sem código específico por plataforma. Resolve o R1. **Ressalva:** varredura em segundo plano no iOS é limitada; só o iBeacon (via CoreLocation) acorda um app encerrado. Não afeta o MVP, em que o funcionário abre o app para bater ponto, mas inviabiliza um futuro "ponto automático ao entrar no hangar" sem voltar ao iBeacon. **Mitigação na compra:** a maioria dos beacons transmite os dois formatos em paralelo (advertising interleaved) pelo mesmo preço — comprar assim mantém a porta aberta de graça. |
 | D9 | **Validar no Android primeiro**, iOS depois | Android permite sideload de APK sem custo nem aprovação, então o ciclo de teste é imediato. A conta Apple ($99/ano) só é comprada depois que o fluxo estiver provado em Android, evitando gastar antes de validar. Consequência: a Etapa 9 entrega Android primeiro e o iOS vira uma sub-etapa (9b). |
+| D10 | **Configuração de batida por empresa**, não por local | O modo de bater ponto é política da companhia, e um funcionário que circula entre o hangar e o escritório não deveria ver telas diferentes conforme onde está. Por local multiplicaria a manutenção e criaria a pergunta "qual vale?" quando alguém transita. |
+| D11 | **O rótulo escolhido carrega o `entry_type`**, definido pelo RH | O funcionário escolhe "Início do almoço" sem precisar saber o que é `break_start`. A tradução fica com quem entende de jornada. Alternativa descartada: deixar o texto livre decidir o tipo — devolveria ao funcionário exatamente a escolha que a dedução automática existe para evitar (ver D5 e `_deduce_entry_type`). |
+| D12 | **`label` e `note` gravados como texto no ponto**, não como referência ao cadastro | Um ponto é evidência. Se o RH renomear ou apagar a opção no ano que vem, o registro tem de continuar dizendo o que estava escrito na tela quando a pessoa tocou nele. O `entry_type` é o que sustenta a soma de horas; os dois textos descrevem. |
 
 ---
 
@@ -416,8 +419,47 @@ Postgres + API respondendo.
 | 6 — Validação de localização | 🟢 concluída | 2026-07-30 |
 | 7 — Bater ponto | 🟢 concluída | 2026-07-30 |
 | 8 — Painel admin | 🟢 concluída | 2026-07-30 |
-| 9 — App do funcionário (Android) | 🟡 código pronto, aguarda hardware | |
+| 9 — App do funcionário (Android) | 🟢 concluída — ponto aprovado com beacon real | 2026-08-02 |
+| 9c — Configuração de batida | 🟢 concluída | 2026-08-03 |
 | 9b — Paridade no iOS | ⚪ não iniciada | |
 | 10 — Liveness | ⚪ não iniciada | |
 | 11 — LGPD | ⚪ não iniciada | |
 | 12 — Deploy | ⚪ não iniciada | |
+
+### Validação em campo (2026-08-02)
+
+Ponto aprovado ponta a ponta com o **Aruba ARBT0100**: rosto 0,792, beacon a
+−47 dBm, `location_method = beacon`, `status = approved`.
+
+Três defeitos que só apareceram com hardware real, e o que cada um ensinou:
+
+1. **`neverForLocation`** no manifesto do `react-native-ble-plx` fazia o Android
+   filtrar justamente os anúncios de beacon. A varredura achava dezenas de
+   aparelhos e nunca o beacon. Corrigido por config plugin com `tools:remove`.
+2. **`EXPO_PUBLIC_API_URL` não chegava ao APK** — `.env` é gitignored e o EAS
+   envia o projeto pelo git. Não aparecia rodando via Metro, que carrega o
+   `.env` da máquina de desenvolvimento.
+3. **`{ uri, name, type }` em FormData** deixou de funcionar no Expo SDK 54+,
+   que substitui o `fetch` global. A selfie passou a ir como `File` do
+   `expo-file-system`.
+
+Os três tinham o mesmo formato: **o sintoma mentia sobre a causa**. Detalhes em
+[docs/testar-com-beacon.md](docs/testar-com-beacon.md) e
+[docs/app-do-funcionario.md](docs/app-do-funcionario.md).
+
+### Etapa 9c — Configuração de batida (2026-08-03)
+
+O RH define, em `/configuracoes`, o que o funcionário preenche ao bater ponto:
+
+| Dimensão | Modos |
+|---|---|
+| **Observação** | oculta · opcional · obrigatória (com texto de instrução do RH) |
+| **Tipo da batida** | oculto · texto livre · lista de opções do RH |
+
+Só o modo de lista muda a apuração de horas: cada opção que o RH cadastra
+carrega um `entry_type` (ver D11). No modo livre o texto apenas descreve.
+
+Ausência de configuração é o padrão e mantém o comportamento anterior —
+nenhuma empresa que já usa o sistema é afetada. **Critério de pronto:** 27
+testes de backend cobrindo os modos, o congelamento do que foi declarado e as
+configurações que travariam a tela do funcionário.
