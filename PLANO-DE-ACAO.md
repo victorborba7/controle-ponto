@@ -33,7 +33,7 @@
 | D3 | **Match facial 1:1 como padrão**, engine preparada para 1:N | O funcionário já está logado no app, então sabemos quem ele diz ser. Comparar contra o embedding dele é mais preciso e mais seguro que varrer a base. A API da engine expõe `verify()` e `identify()` — o modo quiosque (tablet na portaria) da fase 2 usa o 1:N sem reescrita. |
 | D4 | **Múltiplos embeddings por funcionário** (3–5 fotos no cadastro) | Um único embedding erra muito com mudança de luz, óculos, barba. Score final = melhor match entre os templates ativos. |
 | D5 | **Ponto duvidoso vira `pending_review`, não erro** | Se o rosto bate com score no limiar ou nenhum sinal de localização apareceu, registra mesmo assim e sinaliza para o RH decidir. Bloquear o funcionário de bater ponto é pior que um registro para revisar. |
-| D6 | **Expo + EAS Build** no app React Native | A máquina de desenvolvimento é Windows: **não é possível compilar iOS localmente sem um Mac**. O EAS Build compila na nuvem e envia para o TestFlight. BLE, câmera e GPS funcionam via config plugins + dev client. |
+| D6 | **Expo + EAS Build** no app React Native | A máquina de desenvolvimento era Windows: **não é possível compilar iOS localmente sem um Mac**. O EAS Build compila na nuvem e envia para o TestFlight. BLE, câmera e GPS funcionam via config plugins + dev client. **Atualização (16/08/2026):** o desenvolvimento migrou para um Mac, então o ciclo de teste em iPhone passou a ser `npx expo run:ios --device`, que dispensa a conta paga e é muito mais rápido que a fila da nuvem. O EAS continua sendo o caminho da distribuição (TestFlight). |
 | D7 | **SQLAlchemy 2.0 async + Alembic + asyncpg** | Padrão atual do ecossistema FastAPI, migrações versionadas desde o começo. |
 | D8 | **Beacons Eddystone**, não iBeacon | Eddystone é advertisement BLE comum (service UUID `0xFEAA`, namespace 10 bytes + instance 6 bytes). Como não recebe tratamento especial do iOS, `react-native-ble-plx` lê nos dois sistemas — uma biblioteca só, sem código específico por plataforma. Resolve o R1. **Ressalva:** varredura em segundo plano no iOS é limitada; só o iBeacon (via CoreLocation) acorda um app encerrado. Não afeta o MVP, em que o funcionário abre o app para bater ponto, mas inviabiliza um futuro "ponto automático ao entrar no hangar" sem voltar ao iBeacon. **Mitigação na compra:** a maioria dos beacons transmite os dois formatos em paralelo (advertising interleaved) pelo mesmo preço — comprar assim mantém a porta aberta de graça. |
 | D9 | **Validar no Android primeiro**, iOS depois | Android permite sideload de APK sem custo nem aprovação, então o ciclo de teste é imediato. A conta Apple ($99/ano) só é comprada depois que o fluxo estiver provado em Android, evitando gastar antes de validar. Consequência: a Etapa 9 entrega Android primeiro e o iOS vira uma sub-etapa (9b). |
@@ -325,8 +325,11 @@ Postgres + API respondendo.
 
 **Entregáveis**
 - Conta Apple Developer ativa e certificados no EAS
-- Build iOS via EAS (sem Mac, decisão D6) e distribuição por TestFlight
-- Entitlement *Access WiFi Information* solicitada e configurada (R2)
+- Build iOS via EAS e distribuição por TestFlight
+- **Devolver a entitlement *Access WiFi Information* ao `app.json`** — ela foi
+  retirada em 16/08/2026 porque conta gratuita não configura essa capability, e
+  declará-la fazia a assinatura falhar. Sem ela o elo Wi-Fi fica cego no iPhone
+  (R2). Detalhes em [docs/app-do-funcionario.md](docs/app-do-funcionario.md)
 - Validar a varredura Eddystone em iPhone físico — é o ponto que motivou D8
 - Ajustar as telas de permissão ao texto que a Apple exige
 

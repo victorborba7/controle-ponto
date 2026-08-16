@@ -212,11 +212,30 @@ quando um local só tem beacons cadastrados por MAC.
 
 ### Passos
 
-1. Conta Apple Developer paga (US$ 99/ano) — sem ela **não há como instalar
-   nada em iPhone**, nem por TestFlight nem por Ad Hoc
-2. `eas build --profile development --platform ios`
-3. `eas submit --platform ios` para o TestFlight
-4. Validar com beacon físico
+Dois caminhos, e a escolha depende de ter um Mac à mão.
+
+**Build local (Mac com Xcode).** É o ciclo rápido, e **não exige a conta paga**:
+um Apple ID comum assina para desenvolvimento no seu próprio aparelho, com a
+ressalva de que o app expira em 7 dias e precisa ser reinstalado.
+
+```bash
+cd employee-app
+cp .env.example .env          # EXPO_PUBLIC_API_URL com o IP da máquina na rede
+npm install
+npx expo prebuild -p ios      # gera ios/ e roda o pod install
+npx expo run:ios --device     # compila e instala no iPhone conectado
+```
+
+`ios/` é gerado e ignorado pelo git: **nada editado lá sobrevive** ao próximo
+`prebuild --clean`. Configuração nativa mora no `app.json` ou num config plugin.
+
+**Build pelo EAS.** É o caminho da distribuição, e aí a conta paga (US$ 99/ano)
+é obrigatória:
+
+```bash
+eas build --profile development --platform ios
+eas submit --platform ios     # TestFlight
+```
 
 > **`simulator: false` é de propósito.** O simulador do iOS não tem Bluetooth —
 > um build de simulador não serve para testar beacon nenhum.
@@ -240,8 +259,22 @@ mods do Expo executam na ordem **inversa** do registro: o primeiro da lista roda
 por último. `./plugins/withVarreduraDeBeacon` está em primeiro justamente por
 isso — ele desfaz o que os outros fizeram (ver o cabeçalho do arquivo).
 
-A entitlement de leitura de Wi-Fi já está declarada no `app.json`, mas só passa
-a valer com a conta paga.
+**A entitlement de leitura de Wi-Fi foi retirada do `app.json` em 16/08/2026, e
+precisa voltar.** *Access WiFi Information* exige configurar a capability no
+portal da Apple, o que uma conta gratuita não faz — com ela declarada, a
+assinatura falha com um erro de provisionamento que não explica o motivo. Foi
+retirada para destravar a validação do beacon antes da compra da conta.
+
+Enquanto ela estiver fora, no iPhone o elo do meio da cadeia (Wi-Fi) fica cego:
+o `NetInfo` devolve SSID nulo e o app mostra *"Rede Wi-Fi não identificada —
+verifique a permissão de localização"*. **No iPhone essa mensagem mente**: não é
+permissão, é a entitlement ausente. Beacon e GPS não são afetados.
+
+Ao ativar a conta paga, devolva ao `ios` do `app.json`:
+
+```json
+"entitlements": { "com.apple.developer.networking.wifi-info": true }
+```
 
 ---
 

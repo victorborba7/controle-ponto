@@ -15,9 +15,6 @@
         "NSCameraUsageDescription": "A câmera é usada para reconhecer seu rosto no momento de bater o ponto.",
         "NSLocationWhenInUseUsageDescription": "A localização confirma que você está no local de trabalho ao bater o ponto.",
         "NSBluetoothAlwaysUsageDescription": "O Bluetooth detecta os beacons instalados no local de trabalho para confirmar sua presença."
-      },
-      "entitlements": {
-        "com.apple.developer.networking.wifi-info": true
       }
     },
     "android": {

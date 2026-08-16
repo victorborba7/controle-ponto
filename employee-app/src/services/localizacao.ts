@@ -25,6 +25,7 @@ import { consolidar, lerEddystone, type LeituraEddystone } from "./eddystone";
 import { consolidarIBeacons, lerIBeacon, type LeituraIBeacon } from "./ibeacon";
 import { varrerIBeaconsIos } from "./ibeaconIos";
 import { garantirPermissoesBluetooth } from "./permissoes";
+import { coletarSinaisMock, mockAtivo } from "./sinaisMock";
 
 /** Tempo de varredura BLE. Curto o bastante para não irritar, longo o bastante
  *  para o anúncio de um beacon (tipicamente a cada 100–1000 ms) aparecer. */
@@ -327,6 +328,12 @@ async function coletarGps(avisos: string[]) {
 export async function coletarSinais(
   aoProgredir?: (progresso: ProgressoColeta) => void,
 ): Promise<ResumoColeta> {
+  // No simulador não há rádio BLE, Wi-Fi nem GPS de verdade. Em build de
+  // desenvolvimento, `EXPO_PUBLIC_MOCK_SINAIS` substitui toda a coleta por
+  // sinais falsos (ver `sinaisMock`). Em produção `mockAtivo()` é sempre null.
+  const cenario = mockAtivo();
+  if (cenario) return coletarSinaisMock(cenario, aoProgredir);
+
   const avisos: string[] = [];
 
   // A configuração vem do cache quando não há rede — que é exatamente o caso
