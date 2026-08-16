@@ -35,6 +35,7 @@ from app.api.deps import (
     require_roles,
 )
 from app.core.messages import Msg, traduzir
+from app.core.net import client_ip
 from app.facial.imaging import MAX_IMAGE_BYTES
 from app.models import Device, Employee, Site, TimeEntry
 from app.models.enums import (
@@ -61,10 +62,6 @@ from app.services import time_entry as service
 router = APIRouter(prefix="/time-entries", tags=["ponto"])
 
 REVISAO = [Depends(require_roles(UserRole.OWNER, UserRole.HR))]
-
-
-def _client_ip(request: Request) -> str | None:
-    return request.client.host if request.client else None
 
 
 async def _read_selfie(upload: UploadFile, idioma: str) -> bytes:
@@ -175,7 +172,7 @@ async def punch(
             entity_type="time_entry",
             payload={"recusado": True, "face_score": exc.score},
             description=str(exc),
-            ip_address=_client_ip(request),
+            ip_address=client_ip(request),
         )
         await session.commit()
         raise erro_http(
@@ -216,7 +213,7 @@ async def punch(
                 "face_score": resultado.entry.face_match_score,
             },
             description=resultado.decision.reason,
-            ip_address=_client_ip(request),
+            ip_address=client_ip(request),
         )
 
     return TimeEntryCreated(
@@ -363,7 +360,7 @@ async def review(
         entity_id=entry.id,
         payload=trilha,
         description=payload.note,
-        ip_address=_client_ip(request),
+        ip_address=client_ip(request),
     )
 
     employees = await service.load_employees_for(session, [entry])

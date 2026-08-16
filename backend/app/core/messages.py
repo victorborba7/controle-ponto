@@ -46,6 +46,7 @@ class Msg(StrEnum):
     SO_PAINEL = "admin_panel_only"
     SO_APP = "employee_app_only"
     SEM_PERMISSAO = "insufficient_permission"
+    MUITAS_TENTATIVAS = "too_many_attempts"
 
     # --- recursos nao encontrados ---------------------------------------
     FUNCIONARIO_NAO_ENCONTRADO = "employee_not_found"
@@ -117,6 +118,9 @@ CATALOGO: Final[dict[str, dict[Msg, str]]] = {
         Msg.SO_PAINEL: "This resource is restricted to the admin panel.",
         Msg.SO_APP: "This resource is restricted to the employee app.",
         Msg.SEM_PERMISSAO: "You do not have permission for this operation.",
+        Msg.MUITAS_TENTATIVAS: (
+            "Too many failed sign-in attempts. Try again in about {minutes} min."
+        ),
         Msg.FUNCIONARIO_NAO_ENCONTRADO: "Employee not found.",
         Msg.TEMPLATE_NAO_ENCONTRADO: "Face template not found.",
         Msg.LOCAL_NAO_ENCONTRADO: "Site not found.",
@@ -184,6 +188,9 @@ CATALOGO: Final[dict[str, dict[Msg, str]]] = {
         Msg.SO_PAINEL: "Este recurso é restrito ao painel administrativo.",
         Msg.SO_APP: "Este recurso é restrito ao app do funcionário.",
         Msg.SEM_PERMISSAO: "Você não tem permissão para esta operação.",
+        Msg.MUITAS_TENTATIVAS: (
+            "Tentativas de entrada demais. Tente de novo em cerca de {minutes} min."
+        ),
         Msg.FUNCIONARIO_NAO_ENCONTRADO: "Funcionário não encontrado.",
         Msg.TEMPLATE_NAO_ENCONTRADO: "Cadastro facial não encontrado.",
         Msg.LOCAL_NAO_ENCONTRADO: "Local não encontrado.",

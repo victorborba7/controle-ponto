@@ -31,6 +31,7 @@ from app.api.deps import (
     require_roles,
 )
 from app.core.messages import Msg
+from app.core.net import client_ip
 from app.facial.imaging import MAX_IMAGE_BYTES
 from app.models import Employee, FaceTemplate
 from app.models.enums import AuditAction, UserRole
@@ -49,10 +50,6 @@ router = APIRouter(prefix="/employees/{employee_id}/face-templates", tags=["biom
 # Consultar e papel de qualquer perfil do painel; cadastrar biometria nao e de
 # quem so tem acesso de leitura.
 ESCRITA = [Depends(require_roles(UserRole.OWNER, UserRole.HR))]
-
-
-def _client_ip(request: Request) -> str | None:
-    return request.client.host if request.client else None
 
 
 async def _get_employee_or_404(repo: TenantRepo, employee_id: uuid.UUID, idioma: str) -> Employee:
@@ -135,7 +132,7 @@ async def enroll(
             employee=employee,
             images=uploads,
             consent=consent,
-            ip_address=_client_ip(request),
+            ip_address=client_ip(request),
             user_agent=request.headers.get("user-agent", "")[:400] or None,
         )
     except enrollment_service.ConsentRequiredError as exc:
@@ -170,7 +167,7 @@ async def enroll(
             "versao_do_termo": consent.policy_version,
         },
         description=f"Cadastro biometrico de {employee.name}",
-        ip_address=_client_ip(request),
+        ip_address=client_ip(request),
     )
 
     return EnrollmentResult(
@@ -231,7 +228,7 @@ async def deactivate_template(
         entity_type="face_template",
         entity_id=template.id,
         description="Template facial desativado",
-        ip_address=_client_ip(request),
+        ip_address=client_ip(request),
     )
 
     return FaceTemplateSummary.model_validate(template)

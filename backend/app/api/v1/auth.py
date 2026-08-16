@@ -8,8 +8,11 @@ sao diferentes.
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import CurrentPrincipal, SessionDep
+from app.api.deps import CurrentPrincipal, Locale, SessionDep, erro_http
+from app.core.messages import Msg
+from app.core.net import client_ip
 from app.models import Employee, User
 from app.models.enums import SubjectType
 from app.schemas.auth import (
@@ -23,6 +26,7 @@ from app.schemas.auth import (
     TokenPair,
 )
 from app.services import auth as auth_service
+from app.services import login_throttle
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -33,12 +37,30 @@ _UNAUTHORIZED = HTTPException(
 )
 
 
-def _client_ip(request: Request) -> str | None:
-    return request.client.host if request.client else None
-
-
 def _user_agent(request: Request) -> str | None:
     return request.headers.get("user-agent", "")[:400] or None
+
+
+def _muitas_tentativas(exc: login_throttle.Throttled, idioma: str) -> HTTPException:
+    """429 com `Retry-After`, que e o que um cliente sabe interpretar sozinho."""
+    return erro_http(
+        status.HTTP_429_TOO_MANY_REQUESTS,
+        Msg.MUITAS_TENTATIVAS,
+        idioma,
+        headers={"Retry-After": str(exc.retry_after)},
+        minutes=exc.minutes,
+    )
+
+
+async def _registrar_falha(session: AsyncSession, identidade: str, ip: str | None) -> None:
+    """Conta a tentativa e **commita antes** de o endpoint levantar o 401.
+
+    Sem o commit aqui, a dependencia de sessao desfaria a transacao junto com a
+    excecao e o contador nunca sairia do zero — o teto existiria no codigo e nao
+    no comportamento.
+    """
+    await login_throttle.record_failure(session, identity=identidade, ip=ip)
+    await session.commit()
 
 
 @router.post("/admin/login", response_model=AdminLoginResponse)
@@ -46,8 +68,19 @@ async def admin_login(
     payload: AdminLoginRequest,
     request: Request,
     session: SessionDep,
+    idioma: Locale,
 ) -> AdminLoginResponse:
     """Login do painel administrativo."""
+    ip = client_ip(request)
+    identidade = login_throttle.identity_key(
+        audience="admin", tenant_slug=payload.tenant_slug, identifier=payload.email
+    )
+
+    try:
+        await login_throttle.ensure_allowed(session, identity=identidade, ip=ip)
+    except login_throttle.Throttled as exc:
+        raise _muitas_tentativas(exc, idioma) from exc
+
     try:
         user, tenant = await auth_service.authenticate_admin(
             session,
@@ -56,7 +89,10 @@ async def admin_login(
             password=payload.password,
         )
     except auth_service.AuthError as exc:
+        await _registrar_falha(session, identidade, ip)
         raise _UNAUTHORIZED from exc
+
+    await login_throttle.clear(session, identity=identidade)
 
     tokens, _ = await auth_service.issue_token_pair(
         session,
@@ -64,7 +100,7 @@ async def admin_login(
         subject_id=user.id,
         subject_type=SubjectType.USER,
         role=user.role.value,
-        ip_address=_client_ip(request),
+        ip_address=client_ip(request),
         user_agent=_user_agent(request),
     )
 
@@ -76,8 +112,21 @@ async def employee_login(
     payload: EmployeeLoginRequest,
     request: Request,
     session: SessionDep,
+    idioma: Locale,
 ) -> EmployeeLoginResponse:
     """Login do app do funcionario, com pareamento do aparelho."""
+    ip = client_ip(request)
+    identidade = login_throttle.identity_key(
+        audience="employee",
+        tenant_slug=payload.tenant_slug,
+        identifier=payload.external_code,
+    )
+
+    try:
+        await login_throttle.ensure_allowed(session, identity=identidade, ip=ip)
+    except login_throttle.Throttled as exc:
+        raise _muitas_tentativas(exc, idioma) from exc
+
     try:
         employee, tenant, device = await auth_service.authenticate_employee(
             session,
@@ -87,7 +136,10 @@ async def employee_login(
             device_info=payload.device,
         )
     except auth_service.AuthError as exc:
+        await _registrar_falha(session, identidade, ip)
         raise _UNAUTHORIZED from exc
+
+    await login_throttle.clear(session, identity=identidade)
 
     tokens, _ = await auth_service.issue_token_pair(
         session,
@@ -95,7 +147,7 @@ async def employee_login(
         subject_id=employee.id,
         subject_type=SubjectType.EMPLOYEE,
         device_id=device.id,
-        ip_address=_client_ip(request),
+        ip_address=client_ip(request),
         user_agent=_user_agent(request),
     )
 
@@ -122,7 +174,7 @@ async def refresh(
         return await auth_service.rotate_refresh_token(
             session,
             raw_token=payload.refresh_token,
-            ip_address=_client_ip(request),
+            ip_address=client_ip(request),
             user_agent=_user_agent(request),
         )
     except auth_service.AuthError as exc:

@@ -32,6 +32,23 @@ class Settings(BaseSettings):
     access_token_ttl_minutes: int = 30
     refresh_token_ttl_days: int = 30
 
+    # Ligar apenas quando a API estiver atras de um proxy por onde passa
+    # *todo* acesso (Railway, Fly.io, CDN). Com ela desligada e um proxy no
+    # caminho, o endereco do cliente e tratado como desconhecido — ver
+    # `app.core.net.client_ip`.
+    trust_proxy_headers: bool = False
+
+    # --- Limite de tentativas de login ---
+    # Matricula e um numero curto e adivinhavel ("0001"), e a senha inicial e
+    # definida pelo RH. Sem teto, tentar todas as combinacoes e so questao de
+    # tempo de CPU — e cada tentativa ainda queima um hash Argon2 do servidor.
+    login_max_failures: int = 5
+    login_failure_window_seconds: int = 900
+    # Muitas identidades diferentes falhando do mesmo endereco e o padrao de
+    # quem testa uma senha provavel contra a empresa inteira — ataque que o teto
+    # por identidade nao pega, porque cada conta falha uma vez so.
+    login_spray_max_identities: int = 10
+
     # --- Reconhecimento facial ---
     # "stub" nao baixa modelo nenhum e e o padrao em desenvolvimento e testes.
     # "insightface" exige a imagem com requirements-facial.txt.

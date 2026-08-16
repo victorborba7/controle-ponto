@@ -15,6 +15,7 @@ from app.api.deps import (
     TenantRepo,
     require_roles,
 )
+from app.core.net import client_ip
 from app.models import Beacon, Site, WifiNetwork
 from app.models.enums import AuditAction, UserRole
 from app.schemas.location import (
@@ -41,10 +42,6 @@ from app.services import location as location_service
 router = APIRouter(prefix="/sites", tags=["locais"])
 
 ESCRITA = [Depends(require_roles(UserRole.OWNER, UserRole.HR))]
-
-
-def _client_ip(request: Request) -> str | None:
-    return request.client.host if request.client else None
 
 
 async def _site_or_404(repo: TenantRepo, site_id: uuid.UUID) -> Site:
@@ -111,7 +108,7 @@ async def create_site(
         entity_type="site",
         entity_id=site.id,
         description=f"Local {site.name} cadastrado",
-        ip_address=_client_ip(request),
+        ip_address=client_ip(request),
     )
 
     return await _site_detail(session, site)
@@ -152,7 +149,7 @@ async def update_site(
         entity_type="site",
         entity_id=site.id,
         payload={"campos": sorted(payload.model_dump(exclude_unset=True).keys())},
-        ip_address=_client_ip(request),
+        ip_address=client_ip(request),
     )
 
     return await _site_detail(session, site)
@@ -207,7 +204,7 @@ async def create_beacon(
         entity_id=beacon.id,
         payload={"protocolo": beacon.protocol.value, "local": site.name},
         description=f"Beacon {beacon.label} cadastrado",
-        ip_address=_client_ip(request),
+        ip_address=client_ip(request),
     )
 
     return BeaconSummary.model_validate(beacon)
@@ -242,7 +239,7 @@ async def update_beacon(
         entity_type="beacon",
         entity_id=beacon.id,
         payload={"campos": sorted(payload.model_dump(exclude_unset=True).keys())},
-        ip_address=_client_ip(request),
+        ip_address=client_ip(request),
     )
 
     return BeaconSummary.model_validate(beacon)
@@ -296,7 +293,7 @@ async def create_wifi(
         entity_type="wifi_network",
         entity_id=network.id,
         payload={"ssid": network.ssid, "local": site.name},
-        ip_address=_client_ip(request),
+        ip_address=client_ip(request),
     )
 
     return WifiNetworkSummary.model_validate(network)
@@ -335,7 +332,7 @@ async def update_wifi(
         action=AuditAction.UPDATE,
         entity_type="wifi_network",
         entity_id=network.id,
-        ip_address=_client_ip(request),
+        ip_address=client_ip(request),
     )
 
     return WifiNetworkSummary.model_validate(network)

@@ -24,6 +24,7 @@ from app.models.enums import (
 )
 from app.models.face_template import EMBEDDING_DIM, FaceTemplate
 from app.models.location import Beacon, Site, WifiNetwork
+from app.models.login_attempt import IP_DESCONHECIDO, LoginAttempt
 from app.models.punch_config import (
     LABEL_MAX_LENGTH,
     NOTE_MAX_LENGTH,
@@ -37,6 +38,7 @@ from app.models.user import User
 
 __all__ = [
     "EMBEDDING_DIM",
+    "IP_DESCONHECIDO",
     "LABEL_MAX_LENGTH",
     "NOTE_MAX_LENGTH",
     "AuditAction",
@@ -54,6 +56,7 @@ __all__ = [
     "FaceTemplate",
     "LabelMode",
     "LocationMethod",
+    "LoginAttempt",
     "NoteMode",
     "PunchConfig",
     "PunchLabel",
