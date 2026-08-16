@@ -18,7 +18,7 @@ from app.schemas.location import (
     EddystoneNamespace,
     IBeaconUuid,
 )
-from app.services.identifiers import MAX_RSSI_LIMIT, MIN_RSSI_LIMIT
+from app.services.identifiers import MAX_RSSI_OBSERVED, MIN_RSSI_OBSERVED
 
 # Quantos beacons/redes o app pode reportar de uma vez. Um hangar tem poucos
 # beacons; um payload com centenas e tentativa de sobrecarregar a validacao.
@@ -42,7 +42,10 @@ class BeaconReading(BaseModel):
 
     mac_address: Bssid | None = None
 
-    rssi: int = Field(ge=MIN_RSSI_LIMIT, le=MAX_RSSI_LIMIT)
+    # Faixa fisica do BLE, e nao a faixa do limiar cadastrado: uma leitura e um
+    # fato relatado, e recusa-la invalidaria o payload inteiro — inclusive o
+    # beacon certo que veio junto. Ver `identifiers.MIN_RSSI_OBSERVED`.
+    rssi: int = Field(ge=MIN_RSSI_OBSERVED, le=MAX_RSSI_OBSERVED)
 
     @model_validator(mode="after")
     def identificador_presente(self) -> Self:

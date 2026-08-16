@@ -31,6 +31,31 @@ import { garantirPermissoesBluetooth } from "./permissoes";
 const TIMEOUT_BLE_MS = 4000;
 const TIMEOUT_GPS_MS = 8000;
 
+/**
+ * Faixa de RSSI que o servidor aceita como leitura, e por que ela é filtrada
+ * aqui e não lá.
+ *
+ * O RSSI viaja num byte com sinal, então −127 é o piso físico. Fora disso o que
+ * existe são **sentinelas de "não medido"**, e cada plataforma usa o seu: o
+ * Android devolve 127 e o CoreLocation devolve 0. Nenhum dos dois é um sinal
+ * fortíssimo — são a ausência de medição, e tratá-los como leitura colocaria um
+ * beacon inalcançável no topo da lista.
+ *
+ * Descartar aqui, e não deixar o servidor recusar, é deliberado: a validação
+ * dele é do payload inteiro. Uma única leitura fora da faixa derrubaria a
+ * batida toda — inclusive o beacon certo que veio junto — e o app trata a
+ * recusa como definitiva, ou seja, a batida nem iria para a fila.
+ */
+const RSSI_MINIMO = -127;
+const RSSI_MAXIMO = -1;
+
+/** Teto de leituras por batida, espelhando `MAX_BEACON_READINGS` no servidor. */
+const MAXIMO_BEACONS_RELATADOS = 30;
+
+function rssiMedido(rssi: number): boolean {
+  return Number.isInteger(rssi) && rssi >= RSSI_MINIMO && rssi <= RSSI_MAXIMO;
+}
+
 /** Uma leitura de beacon no formato que o backend espera, seja qual for o protocolo. */
 export type BeaconRelatado =
   | {
@@ -358,7 +383,12 @@ export async function coletarSinais(
       mac_address: b.mac,
       rssi: b.rssi,
     })),
-  ].sort((a, b) => b.rssi - a.rssi);
+  ]
+    .filter((b) => rssiMedido(b.rssi))
+    // Ordenado antes de cortar: se houver mais beacons do que o servidor
+    // aceita, os que ficam de fora precisam ser os mais fracos.
+    .sort((a, b) => b.rssi - a.rssi)
+    .slice(0, MAXIMO_BEACONS_RELATADOS);
 
   const sinais: SinaisColetados = {
     beacons: relatados,

@@ -18,10 +18,33 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 EDDYSTONE_NAMESPACE_BYTES = 10
 EDDYSTONE_INSTANCE_BYTES = 6
 
-# RSSI e negativo: 0 dBm seria o transmissor encostado na antena. Fora desta
-# faixa e erro de digitacao, nao configuracao agressiva.
+# --------------------------------------------------------------------------
+# Duas faixas de RSSI, e confundi-las custa uma batida perdida em campo
+# --------------------------------------------------------------------------
+#
+# **Limiar cadastrado** (`min_rssi` do beacon): e uma escolha de operacao, nao
+# uma medicao. Fora desta faixa e erro de digitacao — um limiar de -10 dBm so
+# aceitaria o celular encostado na antena, e um de -120 aceitaria o predio
+# inteiro.
 MIN_RSSI_LIMIT = -100
 MAX_RSSI_LIMIT = -30
+
+# **Leitura observada** (o que o aparelho relatou ter medido): e um fato, e o
+# servidor nao pode recusar um fato. Aplicar a faixa do limiar aqui foi um bug
+# de verdade: com o celular encostado no beacon a leitura passa de -30 dBm, o
+# payload inteiro era recusado com 422 e o app tratava 422 como recusa
+# definitiva — a batida sumia justamente na situacao mais favoravel possivel.
+#
+# A faixa aqui e a fisica do BLE: o RSSI viaja num byte com sinal, e -127 e o
+# piso. Os valores sentinela de "nao medido" (127 no Android, 0 no CoreLocation)
+# sao descartados no app, que e quem sabe distingui-los.
+#
+# Isto nao e controle de seguranca, e nem tenta ser: quem forja um anuncio forja
+# um numero plausivel com o mesmo esforco. O que sustenta a decisao e o
+# identificador do beacon, a folga sobre o limiar cadastrado e o cruzamento com
+# o GPS.
+MIN_RSSI_OBSERVED = -127
+MAX_RSSI_OBSERVED = 0
 
 _NON_HEX = re.compile(r"[^0-9a-fA-F]")
 

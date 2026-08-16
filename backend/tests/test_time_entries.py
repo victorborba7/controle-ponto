@@ -85,6 +85,70 @@ async def test_ponto_sem_sinal_nenhum_vai_para_revisao(client: AsyncClient, cena
 
 
 # --------------------------------------------------------------------------
+# Forca do sinal relatado
+#
+# A faixa aceita para uma *leitura* nao e a faixa aceita para o *limiar
+# cadastrado*. Confundir as duas ja custou a batida inteira: com o celular
+# encostado no beacon a leitura passa de -30 dBm, e o payload era recusado com
+# 422 — que o app trata como recusa definitiva, sem sequer enfileirar.
+# --------------------------------------------------------------------------
+
+
+async def test_beacon_encostado_no_celular_registra_ponto(
+    client: AsyncClient, cenario: dict
+):
+    """-25 dBm e o celular a centimetros do beacon: o melhor caso possivel."""
+    response = await bater_ponto(client, cenario, evidence=com_beacon(rssi=-25))
+
+    assert response.status_code == 201, response.text
+    entry = response.json()["entry"]
+    assert entry["location_method"] == "beacon"
+    assert entry["status"] == "approved"
+    assert entry["beacon_rssi"] == -25
+
+
+async def test_beacon_alheio_muito_fraco_nao_derruba_a_batida(
+    client: AsyncClient, cenario: dict
+):
+    """Um beacon de terceiro a -110 dBm nao pode invalidar o payload inteiro.
+
+    O app relata tudo que enxergou; uma leitura que nao interessa e para ser
+    ignorada pela cadeia, nao para levar junto o beacon certo que veio ao lado.
+    """
+    evidence = json.dumps(
+        {
+            "beacons": [
+                {
+                    "protocol": "eddystone",
+                    "eddystone_namespace": NAMESPACE,
+                    "eddystone_instance": INSTANCE,
+                    "rssi": -55,
+                },
+                {
+                    "protocol": "eddystone",
+                    "eddystone_namespace": "aaaaaaaaaaaaaaaaaaaa",
+                    "eddystone_instance": "ffffffffffff",
+                    "rssi": -110,
+                },
+            ]
+        }
+    )
+
+    response = await bater_ponto(client, cenario, evidence=evidence)
+
+    assert response.status_code == 201, response.text
+    assert response.json()["entry"]["location_method"] == "beacon"
+    assert response.json()["entry"]["beacon_rssi"] == -55
+
+
+async def test_rssi_fora_da_fisica_do_radio_e_recusado(client: AsyncClient, cenario: dict):
+    """-200 dBm nao existe: nao cabe no byte com sinal que o BLE usa."""
+    response = await bater_ponto(client, cenario, evidence=com_beacon(rssi=-200))
+
+    assert response.status_code == 422
+
+
+# --------------------------------------------------------------------------
 # Reconhecimento facial
 # --------------------------------------------------------------------------
 
