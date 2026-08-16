@@ -10,9 +10,12 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.api.deps import CurrentAdmin, SessionDep, TenantRepo, require_roles
-from app.models import Employee
+from app.core.net import client_ip
+from app.models import Device, Employee
 from app.models.enums import AuditAction, EmployeeStatus, UserRole
 from app.schemas.employee import (
+    DeviceList,
+    DeviceSummary,
     EmployeeCreate,
     EmployeeDetail,
     EmployeeList,
@@ -21,6 +24,7 @@ from app.schemas.employee import (
     PasswordReset,
 )
 from app.services import audit
+from app.services import device as device_service
 from app.services import employee as employee_service
 
 router = APIRouter(prefix="/employees", tags=["employees"])
@@ -28,10 +32,6 @@ router = APIRouter(prefix="/employees", tags=["employees"])
 # Consultar e papel de qualquer perfil do painel; alterar cadastro nao e de
 # quem so tem acesso de leitura.
 ESCRITA = [Depends(require_roles(UserRole.OWNER, UserRole.HR))]
-
-
-def _client_ip(request: Request) -> str | None:
-    return request.client.host if request.client else None
 
 
 async def _get_or_404(repo: TenantRepo, employee_id: uuid.UUID) -> Employee:
@@ -95,7 +95,7 @@ async def create_employee(
         entity_id=employee.id,
         payload={"external_code": employee.external_code},
         description=f"Funcionario {employee.name} cadastrado",
-        ip_address=_client_ip(request),
+        ip_address=client_ip(request),
     )
 
     return await _to_detail(session, employee)
@@ -144,7 +144,7 @@ async def update_employee(
         entity_type="employee",
         entity_id=employee.id,
         payload={"campos": sorted(payload.model_dump(exclude_unset=True).keys())},
-        ip_address=_client_ip(request),
+        ip_address=client_ip(request),
     )
 
     return await _to_detail(session, employee)
@@ -176,7 +176,7 @@ async def deactivate_employee(
         entity_type="employee",
         entity_id=employee.id,
         description=f"Funcionario {employee.name} desativado",
-        ip_address=_client_ip(request),
+        ip_address=client_ip(request),
     )
 
     return await _to_detail(session, employee)
@@ -207,8 +207,123 @@ async def reset_password(
         entity_type="employee",
         entity_id=employee.id,
         description="Senha do app redefinida pelo RH",
-        ip_address=_client_ip(request),
+        ip_address=client_ip(request),
     )
+
+
+# --------------------------------------------------------------------------
+# Aparelhos pareados
+#
+# O pareamento so vale como controle se houver como cortar um aparelho. Antes
+# destes endpoints, `devices.revoked_at` existia no modelo e nada no sistema o
+# preenchia — e o login ainda o limpava, entao revogar seria desfeito pela
+# primeira tentativa de entrar.
+# --------------------------------------------------------------------------
+
+
+@router.get("/{employee_id}/devices", response_model=DeviceList)
+async def list_devices(
+    employee_id: uuid.UUID,
+    _: CurrentAdmin,
+    repo: TenantRepo,
+) -> DeviceList:
+    """Celulares pareados a este funcionario."""
+    employee = await _get_or_404(repo, employee_id)
+    devices = await device_service.list_for_employee(repo, employee)
+
+    return DeviceList(
+        items=[DeviceSummary.model_validate(device) for device in devices],
+        total=len(devices),
+    )
+
+
+@router.post(
+    "/{employee_id}/devices/{device_id}/revoke",
+    response_model=DeviceSummary,
+    dependencies=ESCRITA,
+)
+async def revoke_device(
+    employee_id: uuid.UUID,
+    device_id: uuid.UUID,
+    principal: CurrentAdmin,
+    repo: TenantRepo,
+    session: SessionDep,
+    request: Request,
+) -> DeviceSummary:
+    """Corta o aparelho: ele para de bater ponto e as sessoes abertas caem.
+
+    O funcionario continua entrando pelo app — o que ele nao faz e registrar
+    ponto, com a mensagem que manda procurar o RH. Barrar o login tambem
+    tiraria dele o proprio historico, sem ganho de seguranca nenhum.
+    """
+    employee = await _get_or_404(repo, employee_id)
+    device = await _device_or_404(repo, employee, device_id)
+
+    await device_service.revoke(session, repo, device)
+
+    await audit.record_for(
+        session,
+        principal,
+        action=AuditAction.UPDATE,
+        entity_type="device",
+        entity_id=device.id,
+        payload={"employee_id": str(employee.id), "platform": device.platform.value},
+        description=f"Aparelho {device.model or device.platform.value} revogado",
+        ip_address=client_ip(request),
+    )
+
+    return DeviceSummary.model_validate(device)
+
+
+@router.post(
+    "/{employee_id}/devices/{device_id}/authorize",
+    response_model=DeviceSummary,
+    dependencies=ESCRITA,
+)
+async def authorize_device(
+    employee_id: uuid.UUID,
+    device_id: uuid.UUID,
+    principal: CurrentAdmin,
+    repo: TenantRepo,
+    session: SessionDep,
+    request: Request,
+) -> DeviceSummary:
+    """Reabilita um aparelho revogado. Decisao do RH, nunca automatica."""
+    employee = await _get_or_404(repo, employee_id)
+    device = await _device_or_404(repo, employee, device_id)
+
+    await device_service.authorize(repo, device)
+
+    await audit.record_for(
+        session,
+        principal,
+        action=AuditAction.UPDATE,
+        entity_type="device",
+        entity_id=device.id,
+        payload={"employee_id": str(employee.id), "platform": device.platform.value},
+        description=f"Aparelho {device.model or device.platform.value} reautorizado",
+        ip_address=client_ip(request),
+    )
+
+    return DeviceSummary.model_validate(device)
+
+
+async def _device_or_404(
+    repo: TenantRepo, employee: Employee, device_id: uuid.UUID
+) -> Device:
+    """Aparelho do tenant **e** deste funcionario.
+
+    A segunda checagem nao e redundante: sem ela, um id de aparelho de outro
+    colega passaria so por estar na mesma empresa, e a URL diria uma coisa
+    enquanto a acao faria outra.
+    """
+    device = await repo.get(Device, device_id)
+    if device is None or device.employee_id != employee.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Aparelho nao encontrado",
+        )
+    return device
 
 
 async def _to_detail(session: SessionDep, employee: Employee) -> EmployeeDetail:

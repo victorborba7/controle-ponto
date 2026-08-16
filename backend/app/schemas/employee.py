@@ -6,7 +6,7 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field
 
-from app.models.enums import EmployeeStatus
+from app.models.enums import DevicePlatform, EmployeeStatus
 
 
 def normalizar_cpf(value: str) -> str:
@@ -96,3 +96,37 @@ class EmployeeList(BaseModel):
 
 class PasswordReset(BaseModel):
     new_password: str = Field(min_length=6, max_length=200)
+
+
+# --------------------------------------------------------------------------
+# Aparelhos pareados
+# --------------------------------------------------------------------------
+
+
+class DeviceSummary(BaseModel):
+    """Aparelho pareado, como o painel o mostra.
+
+    Sem o `device_fingerprint`: e o segredo que amarra o celular a pessoa, e
+    quem o tivesse poderia se passar pelo aparelho no proximo login. A tela
+    identifica pelo modelo e pela data — que e o que um humano reconhece.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    platform: DevicePlatform
+    model: str | None = None
+    os_version: str | None = None
+    app_version: str | None = None
+    last_seen_at: datetime | None = None
+    revoked_at: datetime | None = None
+    created_at: datetime
+
+    @property
+    def is_active(self) -> bool:
+        return self.revoked_at is None
+
+
+class DeviceList(BaseModel):
+    items: list[DeviceSummary]
+    total: int

@@ -46,6 +46,25 @@ export type EmployeeDetail = EmployeeSummary & {
   created_at: string;
 };
 
+export type DevicePlatform = "android" | "ios";
+
+/**
+ * Aparelho pareado ao funcionario.
+ *
+ * Sem `device_fingerprint` — o backend nao o devolve de proposito: e o segredo
+ * que amarra o celular a pessoa no proximo login.
+ */
+export type DeviceSummary = {
+  id: string;
+  platform: DevicePlatform;
+  model: string | null;
+  os_version: string | null;
+  app_version: string | null;
+  last_seen_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+};
+
 export type FaceTemplate = {
   id: string;
   quality_score: number | null;

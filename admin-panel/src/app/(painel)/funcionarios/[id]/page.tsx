@@ -26,6 +26,7 @@ import {
   formatarPercentual,
 } from "@/lib/format";
 import type {
+  DeviceSummary,
   EmployeeDetail,
   EnrollmentResult,
   FaceTemplate,
@@ -43,6 +44,7 @@ export default function FuncionarioPage() {
 
   const [funcionario, setFuncionario] = useState<EmployeeDetail | null>(null);
   const [templates, setTemplates] = useState<FaceTemplate[]>([]);
+  const [aparelhos, setAparelhos] = useState<DeviceSummary[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -54,12 +56,14 @@ export default function FuncionarioPage() {
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
-      const [ficha, lista] = await Promise.all([
+      const [ficha, lista, celulares] = await Promise.all([
         api.get<EmployeeDetail>(`/employees/${id}`),
         api.get<Paginated<FaceTemplate>>(`/employees/${id}/face-templates`),
+        api.get<Paginated<DeviceSummary>>(`/employees/${id}/devices`),
       ]);
       setFuncionario(ficha);
       setTemplates(lista.items);
+      setAparelhos(celulares.items);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao carregar");
     } finally {
@@ -128,6 +132,21 @@ export default function FuncionarioPage() {
       await carregar();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao redefinir a senha");
+    }
+  }
+
+  async function alternarAparelho(aparelho: DeviceSummary) {
+    const acao = aparelho.revoked_at ? "authorize" : "revoke";
+    try {
+      await api.post(`/employees/${id}/devices/${aparelho.id}/${acao}`);
+      setAviso(
+        aparelho.revoked_at
+          ? "Aparelho reautorizado. O funcionário precisa entrar de novo no app."
+          : "Aparelho revogado. Ele não bate mais ponto e as sessões abertas caíram.",
+      );
+      await carregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao alterar o aparelho");
     }
   }
 
@@ -291,6 +310,68 @@ export default function FuncionarioPage() {
           </div>
         </Card>
       )}
+
+      <Card title="Aparelhos pareados">
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          O ponto só é aceito do celular pareado. Revogue quando o aparelho for
+          perdido, roubado ou devolvido — o funcionário continua entrando no app
+          para ver o próprio histórico, mas para de bater ponto até o RH
+          reautorizar.
+        </p>
+
+        {aparelhos.length === 0 ? (
+          <div className="mt-4">
+            <Vazio>Nenhum aparelho pareado. O pareamento acontece no primeiro login pelo app.</Vazio>
+          </div>
+        ) : (
+          <div className="mt-4">
+            <Tabela>
+              <thead>
+                <tr>
+                  <Th>Aparelho</Th>
+                  <Th>Último acesso</Th>
+                  <Th>Situação</Th>
+                  <Th>{""}</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {aparelhos.map((aparelho) => (
+                  <tr key={aparelho.id}>
+                    <Td>
+                      {aparelho.model ?? "Modelo não informado"}
+                      <span className="block text-xs text-zinc-500">
+                        {aparelho.platform === "ios" ? "iPhone" : "Android"}
+                        {aparelho.os_version && ` ${aparelho.os_version}`}
+                        {aparelho.app_version && ` · app ${aparelho.app_version}`}
+                      </span>
+                    </Td>
+                    <Td>{formatarDataHora(aparelho.last_seen_at)}</Td>
+                    <Td>
+                      {aparelho.revoked_at ? (
+                        <Badge className="bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300">
+                          Revogado em {formatarData(aparelho.revoked_at)}
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                          Ativo
+                        </Badge>
+                      )}
+                    </Td>
+                    <Td>
+                      <Button
+                        variant={aparelho.revoked_at ? "secondary" : "danger"}
+                        onClick={() => alternarAparelho(aparelho)}
+                      >
+                        {aparelho.revoked_at ? "Reautorizar" : "Revogar"}
+                      </Button>
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Tabela>
+          </div>
+        )}
+      </Card>
 
       <Card title="Fotos de referência">
         {templates.length === 0 ? (

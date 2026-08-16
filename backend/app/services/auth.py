@@ -215,8 +215,15 @@ async def _register_device(
     device.os_version = device_info.os_version
     device.app_version = device_info.app_version
     device.last_seen_at = _now()
-    # Um login bem-sucedido reabilita um aparelho revogado.
-    device.revoked_at = None
+
+    # `revoked_at` NAO e limpo aqui, e essa e a diferenca entre revogacao ser um
+    # controle e ser um enfeite: antes, entrar com a senha reabilitava o
+    # aparelho, entao revogar um celular roubado durava ate o ladrao tocar em
+    # "entrar". Reabilitar e ato do RH, em `POST .../devices/{id}/authorize`.
+    #
+    # O login em si continua valendo — a pessoa entra e ve o proprio historico.
+    # O que o aparelho revogado nao faz e bater ponto: quem barra e
+    # `_ensure_device_trusted`, com uma mensagem que manda procurar o RH.
 
     await session.flush()
     return device
