@@ -177,6 +177,14 @@ class FaceEngine(ABC):
         da para saber qual delas esta batendo ponto.
         """
 
+    def warmup(self) -> None:
+        """Antecipa o custo de inicializacao da engine.
+
+        Concreta e vazia: engine que nao carrega nada (a stub) nao precisa
+        fazer nada, e obrigar cada implementacao a declarar um `pass` so
+        acrescentaria ruido. Quem carrega peso sobrescreve.
+        """
+
     # ---- Comparacao ----
     # Concretas, e nao abstratas, porque cosseno serve para toda familia
     # ArcFace. Um modelo futuro com outra metrica sobrescreve.

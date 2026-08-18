@@ -43,6 +43,16 @@ class AsyncFaceEngine:
     def embedding_dim(self) -> int:
         return self._engine.embedding_dim
 
+    async def warmup(self) -> None:
+        """Carrega o modelo agora, em thread, para nao pagar na primeira batida.
+
+        Em thread pelo mesmo motivo das demais: a carga do ArcFace leva
+        segundos de CPU pura, e no start da aplicacao o event loop precisa
+        continuar respondendo o healthcheck — do contrario a plataforma
+        conclui que a maquina nunca subiu e reverte o deploy.
+        """
+        await anyio.to_thread.run_sync(self._engine.warmup)
+
     async def detect(self, image: bytes) -> list[DetectedFace]:
         return await anyio.to_thread.run_sync(self._engine.detect, image)
 

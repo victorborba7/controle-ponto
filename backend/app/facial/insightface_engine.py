@@ -88,8 +88,19 @@ class InsightFaceEngine(FaceEngine):
             ) from exc
 
         try:
-            analysis = FaceAnalysis(name=self._model_name, providers=self._providers)
-            analysis.prepare(ctx_id=0, det_size=self._detection_size)
+            # So deteccao e reconhecimento. O pacote buffalo_l traz ainda
+            # genderage, landmark_2d_106 e landmark_3d_68, que este sistema
+            # nunca le — `_to_detected_face` usa apenas bbox, det_score e
+            # normed_embedding. Carrega-los custaria RAM e milissegundos em
+            # toda batida, e e RAM que dimensiona a maquina de producao.
+            analysis = FaceAnalysis(
+                name=self._model_name,
+                providers=self._providers,
+                allowed_modules=["detection", "recognition"],
+            )
+            # ctx_id negativo = CPU. Com providers ja fixados em CPU o valor
+            # era inofensivo, mas 0 significa "GPU 0" e mentia sobre a intencao.
+            analysis.prepare(ctx_id=-1, det_size=self._detection_size)
         except Exception as exc:
             raise EngineUnavailableError(
                 f"Falha ao carregar o modelo {self._model_name}: {exc}"

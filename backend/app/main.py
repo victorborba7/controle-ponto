@@ -1,5 +1,6 @@
 """Ponto de entrada da API."""
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -16,10 +17,26 @@ from app.api.v1 import (
 )
 from app.core.config import settings
 from app.db.session import engine
+from app.facial import get_face_engine
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # O primeiro uso da engine carrega o modelo, e isso leva segundos. Sem
+    # antecipar aqui, quem paga a conta e o primeiro funcionario a bater ponto
+    # depois de cada deploy — alguem parado na porta do hangar as 7h.
+    #
+    # Falha NAO derruba o start: sem modelo a API ainda serve /health, login e
+    # consulta de registros, e so o reconhecimento facial fica indisponivel.
+    # Abortar aqui faria a maquina nunca ficar saudavel e reverteria o deploy
+    # inteiro por causa de um subsistema.
+    try:
+        await get_face_engine().warmup()
+    except Exception:
+        logger.exception("Falha ao pre-carregar a engine facial; seguindo sem ela.")
+
     yield
     await engine.dispose()
 
