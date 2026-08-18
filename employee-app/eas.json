@@ -14,10 +14,9 @@
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://192.168.3.27:8000"
+        "EXPO_PUBLIC_API_URL": "https://waypoint-api.fly.dev"
       }
     },
-
     "preview": {
       "distribution": "internal",
       "android": {
@@ -27,18 +26,19 @@
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://192.168.3.27:8000"
+        "EXPO_PUBLIC_API_URL": "https://waypoint-api.fly.dev"
       }
     },
-
     "production": {
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://waypoint-api.fly.dev"
       }
     }
   },
-
   "submit": {
     "production": {}
   }

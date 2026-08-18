@@ -11,10 +11,16 @@
       "bundleIdentifier": "com.waypointhq.app",
       "buildNumber": "1",
       "supportsTablet": false,
+      "entitlements": {
+        "com.apple.developer.networking.wifi-info": true
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "A câmera é usada para reconhecer seu rosto no momento de bater o ponto.",
         "NSLocationWhenInUseUsageDescription": "A localização confirma que você está no local de trabalho ao bater o ponto.",
-        "NSBluetoothAlwaysUsageDescription": "O Bluetooth detecta os beacons instalados no local de trabalho para confirmar sua presença."
+        "NSBluetoothAlwaysUsageDescription": "O Bluetooth detecta os beacons instalados no local de trabalho para confirmar sua presença.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
     "android": {
