@@ -1,4 +1,4 @@
-# Ponto Facial
+# Waypoint
 
 Sistema de controle de ponto por reconhecimento facial com validação de presença
 física (beacon BLE → Wi-Fi → GPS).

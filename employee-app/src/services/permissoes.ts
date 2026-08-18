@@ -68,10 +68,10 @@ export async function garantirPermissoesBluetooth(): Promise<ResultadoPermissao>
             "os anúncios dos beacons — sem ela a varredura acha celulares e " +
             "fones, mas nenhum beacon." +
             (permanente
-              ? " Libere em Ajustes → Aplicativos → Ponto Facial → Permissões → Localização."
+              ? " Libere em Ajustes → Aplicativos → Waypoint → Permissões → Localização."
               : "")
           : permanente
-            ? "Permissão de Bluetooth negada. Libere em Ajustes → Aplicativos → Ponto Facial → Permissões."
+            ? "Permissão de Bluetooth negada. Libere em Ajustes → Aplicativos → Waypoint → Permissões."
             : "Sem permissão de Bluetooth não é possível detectar os beacons do local.",
       };
     }

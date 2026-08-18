@@ -136,7 +136,7 @@ export type Chave = keyof typeof en;
 // Tipado como `Record<Chave, string>` de propósito: é o que faz o `tsc`
 // recusar o build quando uma chave nova entra só no inglês.
 const pt: Record<Chave, string> = {
-  "app.nome": "Ponto Facial",
+  "app.nome": "Waypoint",
   "app.painel": "Painel administrativo",
   "app.descricao": "Gestão de funcionários e registros de ponto",
   "nav.pontos": "Pontos",

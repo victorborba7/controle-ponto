@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "Ponto Facial",
-    "slug": "ponto-facial",
+    "name": "Waypoint",
+    "slug": "waypoint",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "scheme": "pontofacial",
+    "scheme": "waypoint",
     "ios": {
-      "bundleIdentifier": "br.com.pontofacial.app",
+      "bundleIdentifier": "com.waypointhq.app",
       "buildNumber": "1",
       "supportsTablet": false,
       "infoPlist": {
@@ -18,7 +18,7 @@
       }
     },
     "android": {
-      "package": "br.com.pontofacial.app",
+      "package": "com.waypointhq.app",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

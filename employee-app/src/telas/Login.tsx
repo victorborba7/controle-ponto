@@ -58,7 +58,7 @@ export function Login({
         keyboardShouldPersistTaps="handled"
       >
         <View style={{ marginBottom: 32, alignItems: "center" }}>
-          <Titulo>Ponto Facial</Titulo>
+          <Titulo>Waypoint</Titulo>
           <Legenda>Entre para registrar seu ponto</Legenda>
         </View>
 

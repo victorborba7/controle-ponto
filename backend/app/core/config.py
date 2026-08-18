@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     )
 
     # --- Aplicacao ---
-    app_name: str = "Ponto Facial API"
+    app_name: str = "Waypoint API"
     environment: Literal["local", "staging", "production"] = "local"
     debug: bool = False
     api_v1_prefix: str = "/api/v1"

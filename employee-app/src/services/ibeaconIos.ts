@@ -77,7 +77,7 @@ export async function varrerIBeaconsIos(
         leituras: [],
         aviso:
           "Sem permissão de localização, o iPhone não entrega os beacons. " +
-          "Libere em Ajustes → Ponto Facial → Localização.",
+          "Libere em Ajustes → Waypoint → Localização.",
       };
     }
 
