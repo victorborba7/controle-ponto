@@ -1,0 +1,22 @@
+# O Dockerfile.prod faz `COPY . /app`. Sem esta lista, a imagem de producao
+# levaria junto caches, a suite de testes e — o que importa de verdade — as
+# fixtures de imagem de rosto usadas nos testes do modelo real.
+
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+
+tests/
+
+# Segredos e artefatos locais nunca entram na imagem: em producao as variaveis
+# vem de `fly secrets`, e uma imagem carrega credencial para onde quer que va.
+.env
+.env.*
+storage/
+*.onnx
+
+# Metadados de deploy nao servem para nada dentro do container.
+fly.toml
+Dockerfile
+Dockerfile.facial

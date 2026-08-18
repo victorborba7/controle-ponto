@@ -1,0 +1,83 @@
+# Imagem de producao: FastAPI + reconhecimento facial real.
+#
+# Diferencas em relacao ao Dockerfile.facial (que e a variante de
+# desenvolvimento com o modelo de verdade):
+#
+#   1. Codigo COPIADO, nao montado por bind mount.
+#   2. Sem `--reload` — o watcher gasta CPU e reinicia a aplicacao sozinho.
+#   3. Sem as dependencias de teste (pytest, ruff, httpx).
+#   4. Modelo EMBUTIDO na imagem, nao baixado no primeiro uso.
+#
+# Sobre (4): o Dockerfile.facial mantem o modelo em volume de proposito, para
+# nao repetir 300 MB a cada recriacao de container no ciclo de desenvolvimento.
+# Em producao o calculo se inverte. Modelo em volume significa que uma maquina
+# recem-criada baixa 300 MB antes de responder a primeira batida — e "primeira
+# batida" e alguem parado na porta do hangar as 7h. Embutir paga esse custo uma
+# vez, no build, e o registry reaproveita a camada em todo deploy seguinte.
+# Em troca a imagem fica em ~1,3 GB, e a maquina nao precisa de volume nenhum.
+
+# --------------------------------------------------------------------------
+# Estagio de build
+# --------------------------------------------------------------------------
+# O insightface nao publica wheel: traz extensoes C++ compiladas na instalacao.
+# Compilar aqui e copiar so o resultado mantem o toolchain (~300 MB) fora da
+# imagem final.
+FROM python:3.12-slim AS builder
+
+ENV PIP_NO_CACHE_DIR=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY requirements.txt requirements-facial.txt ./
+
+# Cython e numpy precisam existir ANTES: o setup.py do insightface os importa
+# durante a propria compilacao.
+RUN pip install --upgrade pip \
+    && pip install --prefix=/install cython numpy \
+    && pip install --prefix=/install -r requirements.txt \
+    && PYTHONPATH=/install/lib/python3.12/site-packages \
+       pip install --prefix=/install -r requirements-facial.txt
+
+# --------------------------------------------------------------------------
+# Imagem final
+# --------------------------------------------------------------------------
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    FACE_ENGINE=insightface \
+    ENVIRONMENT=production \
+    DEBUG=false
+
+# libgomp1: runtime OpenMP exigido pelo onnxruntime.
+# libglib2.0-0: exigido pelo OpenCV mesmo na variante headless.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /install /usr/local
+
+# Baixa e extrai o buffalo_l para /root/.insightface na hora do build.
+# `allowed_modules` espelha o que a engine carrega em runtime — ver
+# app/facial/insightface_engine.py. O pack vem inteiro no zip de qualquer
+# forma; o que muda e o que sobe para a memoria.
+RUN python -c "\
+from insightface.app import FaceAnalysis; \
+FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'], \
+             allowed_modules=['detection', 'recognition']).prepare(ctx_id=-1)"
+
+WORKDIR /app
+COPY . /app
+
+EXPOSE 8000
+
+# UM worker, deliberadamente. Cada worker do uvicorn e um processo separado e
+# carrega a sua propria copia do modelo — dois workers dobram o consumo de RAM
+# e derrubam a maquina por OOM antes de dobrar qualquer vazao. A concorrencia
+# que este sistema precisa ja vem do AsyncFaceEngine, que despacha a inferencia
+# para uma thread sem travar o event loop.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

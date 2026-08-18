@@ -1,0 +1,66 @@
+# Deploy da API. Rodar a partir de backend/:  fly deploy
+#
+# Regiao iad (Ashburn, Virginia). O Fly nao tem Miami; iad e o ponto mais
+# proximo da Florida na lista, e — o que pesa mais — e o mesmo metro do AWS
+# us-east-1, onde fica o Neon.
+#
+# Uma batida faz UMA viagem do celular ate a API e VARIAS da API ate o banco.
+# Aproximar a API do celular afastando-a do banco sairia no negativo: os
+# milissegundos economizados no upload voltariam multiplicados por consulta.
+
+app = "waypoint-api"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile.prod"
+
+# Roda numa maquina temporaria ANTES da nova versao receber trafego. Se a
+# migracao falhar, o deploy aborta e a versao antiga continua servindo.
+[deploy]
+  release_command = "alembic upgrade head"
+
+[env]
+  ENVIRONMENT = "production"
+  DEBUG = "false"
+  FACE_ENGINE = "insightface"
+  # A API so e alcancavel pelo proxy do Fly, entao o X-Forwarded-For e
+  # confiavel. Sem esta chave o endereco do cliente vira "desconhecido" e o
+  # teto de tentativas de login por endereco se desliga sozinho — ver o
+  # comentario em .env.example e app/core/net.py.
+  TRUST_PROXY_HEADERS = "true"
+  STORAGE_PATH = "/data/storage"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+
+  # A maquina NAO dorme. Ligar auto_stop economizaria centavos e cobraria o
+  # preco no pior momento possivel: subir do zero significa carregar o
+  # buffalo_l antes de responder, e a primeira batida do dia e alguem parado
+  # na porta do hangar as 7h. Com 10 funcionarios a economia seria irrisoria.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"
+    # O /health toca o banco, e a carga do modelo atrasa o primeiro request.
+    grace_period = "60s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "2gb"
+
+# Volume para as imagens de rosto (STORAGE_PATH). O modelo NAO precisa de
+# volume: vai embutido na imagem (ver Dockerfile.prod).
+#
+# TEMPORARIO. Antes do go-live isto vira Cloudflare R2 via S3Storage — a
+# abstracao em app/services/storage.py ja foi desenhada para a troca. Volume
+# prende a aplicacao a uma maquina so e transforma backup em tarefa manual.
+# Enquanto o conteudo for dado de teste, migrar depois custa zero.
+[[mounts]]
+  source = "waypoint_storage"
+  destination = "/data"
