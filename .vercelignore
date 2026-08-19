@@ -7,9 +7,15 @@
 # quase tudo node_modules que a Vercel reinstala do lockfile de qualquer jeito.
 
 # Nada aqui participa do build do painel.
-backend
-employee-app
-docs
+#
+# A barra inicial e OBRIGATORIA. Sem ela, a sintaxe gitignore casa o nome em
+# QUALQUER nivel da arvore — e `backend` solto excluia tambem
+# admin-panel/src/app/api/backend/, que e a rota de proxy do painel. O sintoma
+# nao apontava para ca: o login funcionava (rota api/auth, enviada) e todo o
+# resto dava 404 (rota api/backend, ausente do deploy).
+/backend
+/employee-app
+/docs
 
 # Dependencias e artefatos de build, em qualquer nivel.
 node_modules
