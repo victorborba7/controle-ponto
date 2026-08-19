@@ -23,7 +23,7 @@ from app.db.repository import TenantRepository
 from app.facial import FacialError, MatchCandidate, MatchOutcome
 from app.facial.imaging import inspect_image
 from app.facial.runner import AsyncFaceEngine
-from app.models import Device, Employee, FaceTemplate, TimeEntry
+from app.models import Device, Employee, FaceTemplate, Tenant, TimeEntry
 from app.models.enums import EntryType, LocationMethod, TimeEntryStatus
 from app.schemas.evidence import LocationEvidence
 from app.services import enrollment as enrollment_service
@@ -154,7 +154,14 @@ async def punch(
     if not templates:
         raise NoFaceTemplatesError()
 
-    face_score, face_outcome, template_id = await _match_face(engine, selfie, templates)
+    match_threshold, review_threshold = await _limiares_do_tenant(session, repo.tenant_id)
+    face_score, face_outcome, template_id = await _match_face(
+        engine,
+        selfie,
+        templates,
+        match_threshold=match_threshold,
+        review_threshold=review_threshold,
+    )
 
     if face_outcome is MatchOutcome.NO_MATCH:
         # Nem o ponto, nem a selfie sao gravados. A foto e de alguem que o
@@ -279,7 +286,33 @@ async def _find_by_idempotency_key(repo: TenantRepository, key: str) -> TimeEntr
     )
 
 
-async def _match_face(engine: AsyncFaceEngine, selfie: bytes, templates: list[FaceTemplate]):
+async def _limiares_do_tenant(session: AsyncSession, tenant_id: uuid.UUID) -> tuple[float, float]:
+    """Limiares faciais vigentes: os do tenant, ou o padrao global.
+
+    Guardar por tenant existe porque o limiar certo depende da operacao — um
+    hangar com iluminacao ruim e equipe de oculos tolera menos rigor que um
+    escritorio. Coluna NULL, que e o caso de toda empresa real hoje, cai no
+    padrao de `settings` e nao muda decisao nenhuma.
+    """
+    tenant = await session.get(Tenant, tenant_id)
+    match = settings.face_match_threshold
+    review = settings.face_review_threshold
+    if tenant is not None:
+        if tenant.face_match_threshold is not None:
+            match = tenant.face_match_threshold
+        if tenant.face_review_threshold is not None:
+            review = tenant.face_review_threshold
+    return match, review
+
+
+async def _match_face(
+    engine: AsyncFaceEngine,
+    selfie: bytes,
+    templates: list[FaceTemplate],
+    *,
+    match_threshold: float,
+    review_threshold: float,
+):
     """Compara 1:1 contra os templates ativos do proprio funcionario.
 
     1:1 e nao 1:N (decisao D3): o funcionario ja esta autenticado, entao
@@ -313,8 +346,8 @@ async def _match_face(engine: AsyncFaceEngine, selfie: bytes, templates: list[Fa
     resultado = engine.verify_against_templates(
         embedding.vector,
         candidatos,
-        match_threshold=settings.face_match_threshold,
-        review_threshold=settings.face_review_threshold,
+        match_threshold=match_threshold,
+        review_threshold=review_threshold,
     )
     return resultado.score, resultado.outcome, resultado.template_id
 

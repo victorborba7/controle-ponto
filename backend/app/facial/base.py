@@ -177,12 +177,16 @@ class FaceEngine(ABC):
         da para saber qual delas esta batendo ponto.
         """
 
-    def warmup(self) -> None:
+    def warmup(self) -> None:  # noqa: B027 — vazia de proposito, nao abstrata
         """Antecipa o custo de inicializacao da engine.
 
         Concreta e vazia: engine que nao carrega nada (a stub) nao precisa
         fazer nada, e obrigar cada implementacao a declarar um `pass` so
         acrescentaria ruido. Quem carrega peso sobrescreve.
+
+        Marcada com noqa porque o B027 supoe que metodo vazio em ABC seja
+        abstrato esquecido. Aqui o vazio e a implementacao padrao: torna-la
+        abstrata obrigaria toda engine futura a escrever um `pass`.
         """
 
     # ---- Comparacao ----
