@@ -1,0 +1,27 @@
+# A Vercel so publica o painel do RH, mas recebe a raiz do monorepo: o projeto
+# tem Root Directory = admin-panel e desce ate la. Essa configuracao e a que o
+# auto-deploy pelo GitHub tambem usa, entao vale manter os dois caminhos
+# — `vercel --prod` daqui e push no repositorio — enxergando a mesma coisa.
+#
+# Sem esta lista o upload passava de 18 mil arquivos (teto da API: 15 mil),
+# quase tudo node_modules que a Vercel reinstala do lockfile de qualquer jeito.
+
+# Nada aqui participa do build do painel.
+backend
+employee-app
+docs
+
+# Dependencias e artefatos de build, em qualquer nivel.
+node_modules
+.next
+out
+build
+coverage
+*.tsbuildinfo
+
+# Segredos e ruido local.
+.env
+.env.*
+!.env.example
+.git
+.DS_Store

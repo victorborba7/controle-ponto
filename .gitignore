@@ -51,3 +51,4 @@ employee-app/ios/
 .DS_Store
 Thumbs.db
 *.log
+.vercel
