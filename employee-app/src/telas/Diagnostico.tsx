@@ -2,6 +2,7 @@ import * as Clipboard from "expo-clipboard";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
+import { sincronizarConfig, uuidsIBeaconConhecidos } from "../services/configLocal";
 import {
   coletarSinais,
   type BeaconRelatado,
@@ -41,6 +42,33 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
   const [filtro, setFiltro] = useState("");
   const [comparado, setComparado] = useState<ResultadoComparado | null>(null);
   const [comparando, setComparando] = useState(false);
+  const [sincronizando, setSincronizando] = useState(false);
+  const [resumoConfig, setResumoConfig] = useState<string | null>(null);
+
+  /**
+   * Rebaixa o cadastro de locais, ignorando a validade do cache.
+   *
+   * Relata quantos beacons e UUIDs vieram porque e essa a pergunta de quem
+   * aperta: "o que eu acabei de cadastrar chegou?". Um "pronto" mudo deixaria
+   * a duvida de pe.
+   */
+  const sincronizar = useCallback(async () => {
+    setSincronizando(true);
+    setResumoConfig(null);
+    try {
+      const locais = await sincronizarConfig(true);
+      const beacons = locais.reduce((total, local) => total + local.beacons.length, 0);
+      const uuids = uuidsIBeaconConhecidos(locais).length;
+      setResumoConfig(
+        `${locais.length} local(is), ${beacons} beacon(s) cadastrado(s)` +
+          (Platform.OS === "ios" ? ` · ${uuids} UUID(s) de iBeacon para procurar` : ""),
+      );
+    } catch {
+      setResumoConfig("Nao foi possivel atualizar — sem rede? O cache anterior segue valendo.");
+    } finally {
+      setSincronizando(false);
+    }
+  }, []);
 
   const reconhecidos = cru?.dispositivos.filter((d) => d.reconhecido).length ?? 0;
 
@@ -185,6 +213,19 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
           onPress={compararParametros}
           carregando={comparando}
         />
+
+        {/* Quem esta no hangar, ao lado do beacon recem-cadastrado, e
+            exatamente quem nao pode esperar as 12 horas de validade do cache —
+            e no iPhone esperar nao e lentidao, e cegueira: sem o UUID em maos o
+            CoreLocation nem chega a procurar. */}
+        <Botao
+          titulo="Atualizar cadastro do local"
+          variante="secundario"
+          onPress={sincronizar}
+          carregando={sincronizando}
+        />
+
+        {resumoConfig && <Aviso tipo="info">{resumoConfig}</Aviso>}
 
         {comparado && (
           <Cartao>

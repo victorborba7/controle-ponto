@@ -353,10 +353,30 @@ export async function coletarSinais(
 
   // O iOS não entrega iBeacon pelo CoreBluetooth; a varredura acima traz
   // Eddystone, e os iBeacons vêm do CoreLocation, procurados por UUID.
-  const iosIBeacons = await varrerIBeaconsIos(
-    uuidsIBeaconConhecidos(locais),
-    TIMEOUT_BLE_MS,
-  );
+  let uuidsProcurados = uuidsIBeaconConhecidos(locais);
+  let iosIBeacons = await varrerIBeaconsIos(uuidsProcurados, TIMEOUT_BLE_MS);
+
+  // **Cache velho é cego no iPhone, e só no iPhone.** No Android o app relata
+  // tudo que viu e quem compara com o cadastro é o servidor, sempre atualizado.
+  // No iOS o CoreLocation exige a lista de UUIDs *antes* de procurar: um beacon
+  // cadastrado depois da última sincronização não é "não encontrado", é
+  // "nunca procurado" — e o cache dura 12 horas.
+  //
+  // Isso aparece no dia da instalação: o RH cadastra o beacon, o funcionário
+  // aponta o celular para ele, e nada acontece sem explicação nenhuma.
+  //
+  // Só a configuração é rebaixada de imediato (chamada curta); a varredura só
+  // se repete quando surgiu UUID que não existia — do contrário todo
+  // funcionário longe do hangar pagaria 4 s a mais para reconfirmar o óbvio.
+  if (Platform.OS === "ios" && iosIBeacons.leituras.length === 0) {
+    const atualizados = uuidsIBeaconConhecidos(await sincronizarConfig(true));
+    const conhecidos = new Set(uuidsProcurados);
+    if (atualizados.some((uuid) => !conhecidos.has(uuid))) {
+      uuidsProcurados = atualizados;
+      iosIBeacons = await varrerIBeaconsIos(uuidsProcurados, TIMEOUT_BLE_MS);
+    }
+  }
+
   if (iosIBeacons.aviso) avisos.push(iosIBeacons.aviso);
 
   aoProgredir?.({ etapa: "wifi", detalhe: "Verificando a rede Wi-Fi…" });
