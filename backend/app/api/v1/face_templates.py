@@ -22,6 +22,7 @@ from pydantic import ValidationError
 
 from app.api.deps import (
     CurrentAdmin,
+    CurrentEmployee,
     FaceEngineDep,
     Locale,
     SessionDep,
@@ -232,3 +233,118 @@ async def deactivate_template(
     )
 
     return FaceTemplateSummary.model_validate(template)
+
+
+# --------------------------------------------------------------------------
+# Autocadastro pelo proprio funcionario
+# --------------------------------------------------------------------------
+# Router separado porque o caminho e outro: aqui nao ha `employee_id` na URL —
+# o funcionario so pode cadastrar a si mesmo, e quem diz quem ele e e o token.
+# Aceitar id na URL abriria a porta para cadastrar o rosto de outra pessoa.
+router_proprio = APIRouter(prefix="/me/face-templates", tags=["biometria"])
+
+
+@router_proprio.post("", response_model=EnrollmentResult, status_code=status.HTTP_201_CREATED)
+async def enroll_self(
+    principal: CurrentEmployee,
+    repo: TenantRepo,
+    session: SessionDep,
+    engine: FaceEngineDep,
+    storage: StorageDep,
+    request: Request,
+    idioma: Locale,
+    images: list[UploadFile] = File(..., description="De 3 a 5 fotos do proprio rosto"),
+    consent_policy_version: str = Form(..., description="Versao do termo aceito no app"),
+    consent_granted: bool = Form(..., description="Aceite do titular, no proprio aparelho"),
+) -> EnrollmentResult:
+    """Cadastro biometrico feito pelo proprio funcionario, sem passar pelo RH.
+
+    **So na primeira vez.** Se ja existe template ativo, o caminho e o RH.
+    Permitir recadastro livre transformaria uma credencial vazada em controle
+    permanente da conta: bastaria cadastrar o proprio rosto por cima e todas as
+    batidas seguintes casariam com score alto, sem sinal nenhum de fraude.
+
+    Na primeira vez esse risco existe de qualquer forma — a senha inicial e o
+    que prova identidade aqui, e foi uma decisao consciente do produto trocar a
+    conferencia presencial do RH por conveniencia. O que esta rota nao faz e
+    estender esse risco a quem ja esta cadastrado.
+
+    O consentimento vale mais aqui do que no fluxo do RH: quem le o termo e
+    aceita e o titular do dado, no proprio aparelho, e nao alguem marcando uma
+    caixa em nome dele.
+    """
+    employee = await repo.get(Employee, principal.subject_id)
+    if employee is None:
+        raise erro_http(status.HTTP_404_NOT_FOUND, Msg.FUNCIONARIO_NAO_ENCONTRADO, idioma)
+
+    ativos = await enrollment_service.load_active_templates(session, employee)
+    if ativos:
+        raise erro_http(status.HTTP_409_CONFLICT, Msg.ROSTO_JA_CADASTRADO, idioma)
+
+    try:
+        consent = ConsentDeclaration(
+            policy_version=consent_policy_version, granted=consent_granted
+        )
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors()
+        ) from exc
+
+    uploads = [await _read_upload(image, idioma) for image in images]
+
+    try:
+        outcome = await enrollment_service.enroll_face(
+            session,
+            repo,
+            engine,
+            storage,
+            employee=employee,
+            images=uploads,
+            consent=consent,
+            ip_address=client_ip(request),
+            user_agent=request.headers.get("user-agent", "")[:400] or None,
+        )
+    except enrollment_service.ConsentRequiredError as exc:
+        raise erro_http(status.HTTP_403_FORBIDDEN, exc.chave, idioma, **exc.parametros) from exc
+    except enrollment_service.NotEnoughUsableImagesError as exc:
+        raise erro_http(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            exc.chave,
+            idioma,
+            **{
+                **exc.parametros,
+                "problems": enrollment_service.resumir_recusas(exc.rejected, idioma),
+            },
+        ) from exc
+    except enrollment_service.EnrollmentError as exc:
+        raise erro_http(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, exc.chave, idioma, **exc.parametros
+        ) from exc
+
+    # Registrado como autocadastro, e nao como cadastro comum: se um dia houver
+    # contestacao de uma batida, a diferenca entre "o RH viu esta pessoa" e "a
+    # pessoa se cadastrou sozinha" e a primeira coisa que a investigacao precisa
+    # saber.
+    await audit.record_for(
+        session,
+        principal,
+        action=AuditAction.CONSENT_GRANTED,
+        entity_type="face_template",
+        entity_id=employee.id,
+        payload={
+            "autocadastro": True,
+            "templates_criados": len(outcome.templates),
+            "fotos_recusadas": len(outcome.rejected),
+            "versao_do_termo": consent.policy_version,
+        },
+        description=f"Autocadastro biometrico de {employee.name}",
+        ip_address=client_ip(request),
+    )
+
+    return EnrollmentResult(
+        employee_id=employee.id,
+        created=[FaceTemplateSummary.model_validate(t) for t in outcome.templates],
+        rejected=outcome.rejected,
+        deactivated_previous=outcome.deactivated_previous,
+        consent_id=outcome.consent.id,
+    )

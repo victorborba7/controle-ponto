@@ -21,6 +21,8 @@ export type Perfil = {
   precisaTrocarSenha: boolean;
   empresa: string;
   tenantSlug: string;
+  /** Falso enquanto o funcionário não tiver cadastrado o próprio rosto. */
+  rostoCadastrado: boolean;
 };
 
 export class ApiError extends Error {
@@ -53,6 +55,17 @@ export async function salvarSessao(
 ) {
   await SecureStore.setItemAsync(CHAVE_ACCESS, tokens.access_token);
   await SecureStore.setItemAsync(CHAVE_REFRESH, tokens.refresh_token);
+  await SecureStore.setItemAsync(CHAVE_PERFIL, JSON.stringify(perfil));
+}
+
+/**
+ * Regrava só o perfil, mantendo os tokens.
+ *
+ * Usado quando algo do perfil muda sem novo login — hoje, o rosto passando a
+ * estar cadastrado. Sem isto, fechar e reabrir o app devolveria o funcionário
+ * à tela de cadastro que ele acabou de concluir.
+ */
+export async function salvarPerfil(perfil: Perfil) {
   await SecureStore.setItemAsync(CHAVE_PERFIL, JSON.stringify(perfil));
 }
 
@@ -220,6 +233,9 @@ export async function entrar(params: {
     precisaTrocarSenha: corpo.employee.must_change_password,
     empresa: corpo.tenant.name,
     tenantSlug: corpo.tenant.slug,
+    // Ausente num backend antigo: assumir "cadastrado" mantém o comportamento
+    // anterior em vez de mandar quem já tem rosto refazer o cadastro.
+    rostoCadastrado: corpo.employee.face_enrolled ?? true,
   };
 
   await salvarSessao(corpo.tokens, perfil);

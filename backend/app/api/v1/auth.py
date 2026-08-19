@@ -20,12 +20,14 @@ from app.schemas.auth import (
     AdminLoginResponse,
     EmployeeLoginRequest,
     EmployeeLoginResponse,
+    EmployeeProfile,
     LogoutRequest,
     MeResponse,
     RefreshRequest,
     TokenPair,
 )
 from app.services import auth as auth_service
+from app.services import enrollment as enrollment_service
 from app.services import login_throttle
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -151,9 +153,14 @@ async def employee_login(
         user_agent=_user_agent(request),
     )
 
+    perfil = EmployeeProfile.model_validate(employee)
+    perfil.face_enrolled = bool(
+        await enrollment_service.load_active_templates(session, employee)
+    )
+
     return EmployeeLoginResponse(
         tokens=tokens,
-        employee=employee,
+        employee=perfil,
         tenant=tenant,
         device_id=device.id,
     )
@@ -205,6 +212,7 @@ async def me(principal: CurrentPrincipal, session: SessionDep) -> MeResponse:
         if user is None:
             raise _UNAUTHORIZED
         name = user.name
+        face_enrolled = None
     else:
         employee = await session.scalar(
             select(Employee).where(
@@ -215,6 +223,7 @@ async def me(principal: CurrentPrincipal, session: SessionDep) -> MeResponse:
         if employee is None:
             raise _UNAUTHORIZED
         name = employee.name
+        face_enrolled = bool(await enrollment_service.load_active_templates(session, employee))
 
     return MeResponse(
         subject_id=principal.subject_id,
@@ -223,4 +232,5 @@ async def me(principal: CurrentPrincipal, session: SessionDep) -> MeResponse:
         role=principal.role,
         device_id=principal.device_id,
         name=name,
+        face_enrolled=face_enrolled,
     )

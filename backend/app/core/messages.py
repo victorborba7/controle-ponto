@@ -71,6 +71,7 @@ class Msg(StrEnum):
 
     # --- batida de ponto -------------------------------------------------
     ROSTO_NAO_CADASTRADO = "face_not_enrolled"
+    ROSTO_JA_CADASTRADO = "face_already_enrolled"
     ROSTO_NAO_RECONHECIDO = "face_not_recognized"
     CADASTRO_FACIAL_DESATUALIZADO = "face_enrollment_outdated"
     APARELHO_DESVINCULADO = "device_unlinked"
@@ -136,7 +137,13 @@ CATALOGO: Final[dict[str, dict[Msg, str]]] = {
         Msg.VARIOS_ROSTOS: "More than one face in the photo. Frame only yourself.",
         Msg.QUALIDADE_INSUFICIENTE: "The photo quality is not good enough.",
         Msg.RECONHECIMENTO_INDISPONIVEL: "Face recognition is unavailable.",
-        Msg.ROSTO_NAO_CADASTRADO: ("Your face has not been enrolled yet. Please see HR."),
+        Msg.ROSTO_NAO_CADASTRADO: (
+            "Your face has not been enrolled yet. Enroll it in the app to start "
+            "clocking in."
+        ),
+        Msg.ROSTO_JA_CADASTRADO: (
+            "Your face is already enrolled. Contact HR to have it redone."
+        ),
         Msg.ROSTO_NAO_RECONHECIDO: (
             "We did not recognize your face. Try again with better lighting."
         ),
@@ -206,7 +213,13 @@ CATALOGO: Final[dict[str, dict[Msg, str]]] = {
         Msg.VARIOS_ROSTOS: "Mais de um rosto na foto. Enquadre apenas você.",
         Msg.QUALIDADE_INSUFICIENTE: "Qualidade da foto insuficiente.",
         Msg.RECONHECIMENTO_INDISPONIVEL: "Serviço de reconhecimento indisponível.",
-        Msg.ROSTO_NAO_CADASTRADO: "Seu rosto ainda não foi cadastrado. Procure o RH.",
+        Msg.ROSTO_NAO_CADASTRADO: (
+            "Seu rosto ainda não foi cadastrado. Faça o cadastro no aplicativo "
+            "para começar a bater ponto."
+        ),
+        Msg.ROSTO_JA_CADASTRADO: (
+            "Seu rosto já está cadastrado. Procure o RH para refazer."
+        ),
         Msg.ROSTO_NAO_RECONHECIDO: (
             "Não reconhecemos seu rosto. Tente novamente com melhor iluminação."
         ),

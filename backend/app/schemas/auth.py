@@ -65,6 +65,9 @@ class EmployeeProfile(BaseModel):
     external_code: str
     job_title: str | None = None
     must_change_password: bool
+    # Vem do login para o app decidir a tela inicial sem uma segunda chamada —
+    # e para funcionar depois, offline, a partir do perfil guardado.
+    face_enrolled: bool = True
 
 
 class TenantInfo(BaseModel):
@@ -97,3 +100,8 @@ class MeResponse(BaseModel):
     role: UserRole | None = None
     device_id: uuid.UUID | None = None
     name: str
+    # Só faz sentido para funcionário; None no painel. O app decide com isto se
+    # abre a tela de ponto ou a de cadastro do rosto — perguntar tentando bater
+    # ponto e receber erro seria dizer ao recém-contratado que ele fez algo
+    # errado, quando só falta um passo que ninguém explicou.
+    face_enrolled: bool | None = None

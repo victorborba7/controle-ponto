@@ -3,9 +3,10 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useState } from "react";
 import { SafeAreaView, View } from "react-native";
 
-import { encerrarSessao, lerPerfil, type Perfil } from "./src/services/api";
+import { encerrarSessao, lerPerfil, salvarPerfil, type Perfil } from "./src/services/api";
 import { encerrarBle } from "./src/services/localizacao";
 import { BaterPonto } from "./src/telas/BaterPonto";
+import { CadastroDoRosto } from "./src/telas/CadastroDoRosto";
 import { Consentimento, VERSAO_DO_TERMO } from "./src/telas/Consentimento";
 import { Diagnostico } from "./src/telas/Diagnostico";
 import { Historico } from "./src/telas/Historico";
@@ -14,10 +15,22 @@ import { Legenda, cores } from "./src/ui";
 
 const CHAVE_CONSENTIMENTO = "ponto_consentimento_versao";
 
+/**
+ * Para onde vai quem acabou de entrar.
+ *
+ * Sem rosto cadastrado não existe ponto possível — o backend recusaria a
+ * batida com "rosto não cadastrado". Mandar direto para o cadastro transforma
+ * um erro sem saída num passo com instrução.
+ */
+function telaDeQuemEntrou(perfil: Perfil): Tela {
+  return perfil.rostoCadastrado ? "ponto" : "cadastro-do-rosto";
+}
+
 type Tela =
   | "carregando"
   | "consentimento"
   | "login"
+  | "cadastro-do-rosto"
   | "ponto"
   | "historico"
   | "diagnostico";
@@ -46,7 +59,7 @@ export default function App() {
     const salvo = await lerPerfil();
     if (salvo) {
       setPerfil(salvo);
-      setTela("ponto");
+      setTela(telaDeQuemEntrou(salvo));
     } else {
       setTela("login");
     }
@@ -63,7 +76,7 @@ export default function App() {
     await AsyncStorage.setItem(CHAVE_CONSENTIMENTO, VERSAO_DO_TERMO);
     const salvo = await lerPerfil();
     setPerfil(salvo);
-    setTela(salvo ? "ponto" : "login");
+    setTela(salvo ? telaDeQuemEntrou(salvo) : "login");
   }
 
   async function sair() {
@@ -88,7 +101,7 @@ export default function App() {
         <Login
           aoEntrar={(novo) => {
             setPerfil(novo);
-            setTela("ponto");
+            setTela(telaDeQuemEntrou(novo));
           }}
           // Acessível sem login de propósito: na instalação, os beacons são
           // mapeados antes de existir funcionário cadastrado — e quem faz esse
@@ -99,6 +112,19 @@ export default function App() {
 
       {tela === "diagnostico" && (
         <Diagnostico aoVoltar={() => setTela(perfil ? "ponto" : "login")} />
+      )}
+
+      {tela === "cadastro-do-rosto" && perfil && (
+        <CadastroDoRosto
+          perfil={perfil}
+          aoConcluir={() => {
+            const atualizado = { ...perfil, rostoCadastrado: true };
+            setPerfil(atualizado);
+            void salvarPerfil(atualizado);
+            setTela("ponto");
+          }}
+          aoSair={sair}
+        />
       )}
 
       {tela === "ponto" && perfil && (

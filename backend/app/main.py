@@ -62,6 +62,8 @@ app.include_router(health.router)
 app.include_router(auth.router, prefix=settings.api_v1_prefix)
 app.include_router(employees.router, prefix=settings.api_v1_prefix)
 app.include_router(face_templates.router, prefix=settings.api_v1_prefix)
+# Autocadastro do proprio funcionario: caminho sem employee_id na URL.
+app.include_router(face_templates.router_proprio, prefix=settings.api_v1_prefix)
 app.include_router(punch_config.router, prefix=settings.api_v1_prefix)
 app.include_router(sites.router, prefix=settings.api_v1_prefix)
 app.include_router(time_entries.router, prefix=settings.api_v1_prefix)
