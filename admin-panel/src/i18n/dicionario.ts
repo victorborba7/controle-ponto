@@ -27,7 +27,7 @@ import type { Idioma } from "./idioma";
 
 const en = {
   // --- produto e navegação ---
-  "app.nome": "Face Clock",
+  "app.nome": "Waypoint",
   "app.painel": "Admin panel",
   "app.descricao": "Employee management and time entry records",
   "nav.pontos": "Time entries",
