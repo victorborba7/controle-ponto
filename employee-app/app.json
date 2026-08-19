@@ -20,7 +20,11 @@
         "NSBluetoothAlwaysUsageDescription": "O Bluetooth detecta os beacons instalados no local de trabalho para confirmar sua presença.",
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
-        }
+        },
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "android": {
@@ -99,8 +103,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "fc719877-a4b1-4f82-9e03-135b829ad03d"
+        "projectId": "cbd06891-9992-44ca-af2e-86e3669d441e"
       }
-    }
+    },
+    "owner": "vsvborba"
   }
 }

@@ -40,6 +40,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "vsvborba@outlook.com",
+        "ascAppId": "6802800446",
+        "appleTeamId": "W2J9B48YVZ"
+      }
+    }
   }
 }
