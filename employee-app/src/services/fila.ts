@@ -38,6 +38,15 @@ export type BatidaPendente = {
    * escreveria horas depois.
    */
   rotulo?: string;
+  /**
+   * Declaração de que esta é a última batida do dia.
+   *
+   * Vai na fila pelo mesmo motivo dos outros dois: uma saída represada por
+   * falta de sinal no hangar precisa chegar ao servidor **como saída**. Perder
+   * este campo no caminho transformaria o fim da jornada numa batida comum, e
+   * o dia ficaria aberto para sempre — inclusive para as notificações.
+   */
+  encerraODia?: boolean;
   observacao?: string;
 };
 

@@ -9,6 +9,9 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.messages import Msg, traduzir
+from app.models.enums import EntryType, LabelMode, NoteMode
+from app.models.punch_config import PunchConfig, PunchLabel
+from app.services import punch_config
 from tests.conftest import (
     auth_header,
     bater_ponto,
@@ -403,3 +406,46 @@ async def test_funcionario_nao_altera_a_configuracao(client: AsyncClient, cenari
     )
 
     assert resposta.status_code in (401, 403), resposta.text
+
+
+# --------------------------------------------------------------------------
+# Lista vazia: o beco sem saida
+# --------------------------------------------------------------------------
+
+
+def test_modo_lista_sem_opcao_ativa_aceita_texto_livre():
+    """Sem esta queda, ninguem bate ponto ate o RH perceber.
+
+    Em modo de lista com `label_required`, texto vazio e recusado por
+    TIPO_OBRIGATORIO e qualquer texto por TIPO_INEXISTENTE. Acontece de verdade
+    quando o RH desativa a ultima opcao para reorganizar a lista.
+    """
+    config = PunchConfig(
+        label_mode=LabelMode.LIST,
+        label_required=True,
+        note_mode=NoteMode.HIDDEN,
+    )
+    config.labels = []
+
+    resultado = punch_config.resolve(config, label="Troca de pneu", note=None)
+
+    assert resultado.label == "Troca de pneu"
+    # Sem opcao ativa nao ha tipo a carregar: quem decide passa a ser a posicao
+    # da batida no dia.
+    assert resultado.entry_type is None
+
+
+def test_lista_com_opcao_desativada_nao_aceita_o_texto_dela():
+    """A queda vale so quando NAO sobrou nenhuma opcao ativa."""
+    config = PunchConfig(
+        label_mode=LabelMode.LIST,
+        label_required=True,
+        note_mode=NoteMode.HIDDEN,
+    )
+    config.labels = [
+        PunchLabel(name="Saida para campo", entry_type=EntryType.OUT, is_active=True),
+        PunchLabel(name="Aposentado", entry_type=EntryType.OUT, is_active=False),
+    ]
+
+    with pytest.raises(punch_config.PunchInputError):
+        punch_config.resolve(config, label="Aposentado", note=None)

@@ -105,7 +105,7 @@ export function BaterPonto({
     setPermissaoLocalizacao(resultado.granted);
   }
 
-  async function registrar() {
+  async function registrar(encerraODia = false) {
     // Antes de acionar a câmera: numa área sem sinal a batida iria para a fila
     // e a recusa por campo faltando só apareceria horas depois, na
     // sincronização — quando já não dá para corrigir o que se ia escrever.
@@ -147,6 +147,7 @@ export function BaterPonto({
     const resultado = await baterPonto(fotoUri, resumo.sinais, {
       rotulo: rotulo ?? undefined,
       observacao,
+      encerraODia,
     });
     await atualizarPendentes();
 
@@ -345,7 +346,20 @@ export function BaterPonto({
 
         <Botao
           titulo="Registrar ponto"
-          onPress={registrar}
+          onPress={() => registrar(false)}
+          carregando={ocupado}
+          desabilitado={ocupado}
+        />
+
+        {/* Botão próprio, e não um interruptor acima do de registrar.
+            Encerrar a jornada é irreversível dentro do dia — quem esquecer de
+            marcar volta amanhã com o dia aberto —, e um interruptor que se
+            esquece ligado provocaria justamente o engano que ele deveria
+            evitar. Dois botões tornam a escolha um ato, não um estado. */}
+        <Botao
+          titulo="Bater saída (última do dia)"
+          variante="secundario"
+          onPress={() => registrar(true)}
           carregando={ocupado}
           desabilitado={ocupado}
         />

@@ -12,7 +12,7 @@ que gravar.
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +28,7 @@ from app.models.enums import EntryType, LocationMethod, TimeEntryStatus
 from app.schemas.evidence import LocationEvidence
 from app.services import enrollment as enrollment_service
 from app.services import punch_config as punch_config_service
+from app.services.calendario import dia_local
 from app.services.location import load_registry
 from app.services.location_validator import (
     build_audit_payload,
@@ -84,6 +85,12 @@ class DeviceUnlinkedError(TimeEntryError):
     chave = Msg.APARELHO_DESVINCULADO
 
 
+class SaidaSemEntradaError(TimeEntryError):
+    """Pedido de saida num dia em que o funcionario nunca entrou."""
+
+    chave = Msg.SAIDA_SEM_ENTRADA
+
+
 class TooSoonError(TimeEntryError):
     chave = Msg.BATIDA_REPETIDA
 
@@ -114,8 +121,14 @@ async def punch(
     note: str | None = None,
     idempotency_key: str | None = None,
     client_recorded_at: datetime | None = None,
+    closes_day: bool = False,
 ) -> PunchResult:
-    """Registra o ponto do funcionario."""
+    """Registra o ponto do funcionario.
+
+    `closes_day` e a declaracao explicita de que esta e a ultima batida do dia.
+    Nao se deduz: so o funcionario sabe se vai voltar depois do almoco, e errar
+    isso por ele fecharia a jornada de quem ainda ia trabalhar seis horas.
+    """
     now = datetime.now(UTC)
 
     # --- Reenvio da mesma batida ---
@@ -142,12 +155,29 @@ async def punch(
     config = await punch_config_service.load(session, repo)
     declarado = punch_config_service.resolve(config, label=label, note=note)
 
+    # Batida repetida se mede pela ultima batida ABSOLUTA, nao pela do dia:
+    # 23h59 e 00h01 sao o mesmo toque duplicado, ainda que em dias diferentes.
     ultimo = await _last_entry(repo, employee)
     _ensure_not_too_soon(ultimo, now)
 
-    # Precedencia: o que o chamador impos, depois o tipo que o rotulo escolhido
-    # carrega, e so entao a alternancia automatica.
-    tipo = entry_type or declarado.entry_type or _deduce_entry_type(ultimo)
+    tenant = await session.get(Tenant, repo.tenant_id)
+    dia = dia_local(now, tenant.timezone if tenant else None)
+    do_dia = await _entries_of_day(repo, employee, dia)
+
+    if closes_day:
+        # Sem entrada no dia nao ha jornada para encerrar. Recusar aqui e uma
+        # das poucas recusas que o D5 nao cobre: nao ha duvida a resolver, ha
+        # um pedido que nao faz sentido — e registrar uma saida solta
+        # produziria uma jornada negativa na apuracao.
+        if not any(e.entry_type is EntryType.IN for e in do_dia):
+            raise SaidaSemEntradaError()
+        tipo = EntryType.OUT
+    else:
+        # Precedencia: o que o chamador impos, depois o tipo que o rotulo
+        # escolhido carrega, e so entao a posicao da batida no dia.
+        tipo = entry_type or declarado.entry_type or _deduce_entry_type(
+            do_dia[-1] if do_dia else None
+        )
 
     # --- Rosto ---
     templates = await enrollment_service.load_active_templates(session, employee)
@@ -201,6 +231,7 @@ async def punch(
         # gravado ao lado, e a divergencia entre os dois ja entrou na decisao.
         recorded_at=now,
         client_recorded_at=client_recorded_at,
+        business_date=dia,
         face_match_score=face_score,
         matched_face_template_id=template_id,
         selfie_image_key=selfie_key,
@@ -255,19 +286,43 @@ def _ensure_not_too_soon(ultimo: TimeEntry | None, now: datetime) -> None:
         raise TooSoonError(existing=ultimo)
 
 
-def _deduce_entry_type(ultimo: TimeEntry | None) -> EntryType:
-    """Alterna entrada e saida a partir da ultima batida.
+def _deduce_entry_type(ultimo_do_dia: TimeEntry | None) -> EntryType:
+    """Decide o tipo pela posicao da batida **dentro do dia**.
 
-    Deduzir em vez de perguntar tira do funcionario uma escolha que ele pode
-    errar — e um erro ai vira hora extra fantasma ou falta indevida.
+    Sem batida hoje, a batida e entrada — sempre, e independentemente do que
+    houve ontem. Antes a alternancia olhava a ultima batida absoluta, e quem
+    esquecesse de bater a saida na sexta tinha a primeira batida de segunda
+    classificada como *saida*: uma jornada inteira invertida por um esquecimento
+    de dois dias antes.
 
-    Um registro recusado nao entra na conta porque nunca e gravado, e um
-    pendente entra: ele representa uma batida que aconteceu e provavelmente
-    sera aprovada.
+    Havendo entrada, o padrao e INTERMEDIATE. Saida nao se deduz — ela e
+    declarada pelo funcionario (`closes_day`), porque so ele sabe se vai
+    voltar. Deduzi-la faria o sistema fechar a jornada de quem so foi ao
+    almoco.
+
+    Um registro recusado nao entra na conta porque nunca e gravado; um pendente
+    entra, porque representa batida que aconteceu e provavelmente sera aprovada.
     """
-    if ultimo is None:
+    if ultimo_do_dia is None:
         return EntryType.IN
-    return EntryType.OUT if ultimo.entry_type is EntryType.IN else EntryType.IN
+    return EntryType.INTERMEDIATE
+
+
+async def _entries_of_day(
+    repo: TenantRepository, employee: Employee, dia: date
+) -> list[TimeEntry]:
+    """Batidas do funcionario naquele dia de trabalho, em ordem.
+
+    Traz a lista inteira e nao so a ultima porque duas perguntas dependem dela:
+    qual o tipo da proxima batida, e se houve entrada para poder encerrar.
+    Sao poucas linhas por dia — uma consulta serve as duas.
+    """
+    result = await repo.session.execute(
+        repo.query(TimeEntry)
+        .where(TimeEntry.employee_id == employee.id, TimeEntry.business_date == dia)
+        .order_by(TimeEntry.recorded_at)
+    )
+    return list(result.scalars().all())
 
 
 async def _last_entry(repo: TenantRepository, employee: Employee) -> TimeEntry | None:

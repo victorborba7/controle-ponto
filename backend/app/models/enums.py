@@ -38,10 +38,20 @@ class DevicePlatform(StrEnum):
 
 
 class EntryType(StrEnum):
-    """Tipo de batida. O MVP usa IN/OUT; os intervalos ja ficam previstos."""
+    """Tipo de batida.
+
+    IN e OUT delimitam a jornada; os intervalos existem para quem os controla.
+
+    INTERMEDIATE e a batida do meio do dia — a pessoa ja entrou, ainda nao
+    saiu, e esta registrando o que esta fazendo. Precisa ser um tipo proprio e
+    nao um BREAK_END reaproveitado: quem le o relatorio veria "fim de
+    intervalo" onde ninguem parou para nada, e a soma de horas trataria a
+    batida como retomada de jornada.
+    """
 
     IN = "in"
     OUT = "out"
+    INTERMEDIATE = "intermediate"
     BREAK_START = "break_start"
     BREAK_END = "break_end"
 

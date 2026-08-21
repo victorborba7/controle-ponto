@@ -6,10 +6,11 @@ validou a presenca. E o que permite auditar um registro meses depois.
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -33,6 +34,13 @@ class TimeEntry(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
     __table_args__ = (
         # Consulta dominante do painel: pontos de um funcionario num periodo.
         Index("ix_time_entries_tenant_employee_time", "tenant_id", "employee_id", "recorded_at"),
+        # "Ja bateu hoje?" — consulta nova, feita a cada batida.
+        Index(
+            "ix_time_entries_tenant_employee_dia",
+            "tenant_id",
+            "employee_id",
+            "business_date",
+        ),
         # Fila de revisao do RH.
         Index("ix_time_entries_tenant_status", "tenant_id", "status"),
         # Relatorio por periodo do tenant inteiro.
@@ -66,6 +74,17 @@ class TimeEntry(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
     client_recorded_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+    # A que dia de trabalho a batida pertence, no fuso da empresa.
+    #
+    # Coluna, e nao calculo na consulta: converter `recorded_at` de fuso dentro
+    # do WHERE descartaria o indice, e "a primeira batida do dia" e uma busca
+    # que passa a acontecer em toda batida.
+    #
+    # Nao e derivavel de `recorded_at` sozinho depois do fato: se a empresa
+    # mudar de fuso, o passado tem de continuar dizendo a que dia cada jornada
+    # pertenceu quando aconteceu.
+    business_date: Mapped[date] = mapped_column(Date, nullable=False)
 
     # --- O que o funcionario declarou (ver PunchConfig) ---
     # Ambos guardados como texto, e nao como referencia ao cadastro do RH.

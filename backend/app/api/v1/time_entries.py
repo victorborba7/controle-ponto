@@ -125,6 +125,13 @@ async def punch(
     client_recorded_at: datetime | None = Form(
         default=None, description="Horario do aparelho, para deteccao de divergencia"
     ),
+    closes_day: bool = Form(
+        default=False,
+        description=(
+            "Declara que esta e a ultima batida do dia. Nunca e deduzido: so o "
+            "funcionario sabe se vai voltar depois do almoco."
+        ),
+    ),
 ) -> TimeEntryCreated:
     """Registra o ponto do funcionario autenticado.
 
@@ -161,6 +168,7 @@ async def punch(
             note=note,
             idempotency_key=idempotency_key,
             client_recorded_at=client_recorded_at,
+            closes_day=closes_day,
         )
     except service.FaceRejectedError as exc:
         # A tentativa fica na trilha mesmo sem virar registro de ponto: e o que

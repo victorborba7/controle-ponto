@@ -72,6 +72,7 @@ class Msg(StrEnum):
     # --- batida de ponto -------------------------------------------------
     ROSTO_NAO_CADASTRADO = "face_not_enrolled"
     ROSTO_JA_CADASTRADO = "face_already_enrolled"
+    SAIDA_SEM_ENTRADA = "clock_out_without_clock_in"
     ROSTO_NAO_RECONHECIDO = "face_not_recognized"
     CADASTRO_FACIAL_DESATUALIZADO = "face_enrollment_outdated"
     APARELHO_DESVINCULADO = "device_unlinked"
@@ -143,6 +144,9 @@ CATALOGO: Final[dict[str, dict[Msg, str]]] = {
         ),
         Msg.ROSTO_JA_CADASTRADO: (
             "Your face is already enrolled. Contact HR to have it redone."
+        ),
+        Msg.SAIDA_SEM_ENTRADA: (
+            "You have not clocked in today, so there is no shift to close."
         ),
         Msg.ROSTO_NAO_RECONHECIDO: (
             "We did not recognize your face. Try again with better lighting."
@@ -219,6 +223,9 @@ CATALOGO: Final[dict[str, dict[Msg, str]]] = {
         ),
         Msg.ROSTO_JA_CADASTRADO: (
             "Seu rosto já está cadastrado. Procure o RH para refazer."
+        ),
+        Msg.SAIDA_SEM_ENTRADA: (
+            "Você ainda não bateu entrada hoje, então não há jornada para encerrar."
         ),
         Msg.ROSTO_NAO_RECONHECIDO: (
             "Não reconhecemos seu rosto. Tente novamente com melhor iluminação."

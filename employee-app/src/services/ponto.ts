@@ -99,6 +99,7 @@ async function montarFormulario(batida: BatidaPendente): Promise<FormData> {
   // "oculto" faria o servidor recusar a batida.
   if (batida.rotulo) dados.append("label", batida.rotulo);
   if (batida.observacao) dados.append("note", batida.observacao);
+  if (batida.encerraODia) dados.append("closes_day", "true");
 
   // `entry_type` fica de fora de propósito: o servidor deduz entrada ou saída
   // pela última batida, o que tira do funcionário uma escolha que ele pode
@@ -118,7 +119,7 @@ async function montarFormulario(batida: BatidaPendente): Promise<FormData> {
 export async function baterPonto(
   fotoUri: string,
   sinais: SinaisColetados,
-  declarado: { rotulo?: string; observacao?: string } = {},
+  declarado: { rotulo?: string; observacao?: string; encerraODia?: boolean } = {},
 ): Promise<ResultadoEnvio> {
   const batida: BatidaPendente = {
     idempotencyKey: novaChave(),
@@ -128,6 +129,7 @@ export async function baterPonto(
     tentativas: 0,
     rotulo: declarado.rotulo?.trim() || undefined,
     observacao: declarado.observacao?.trim() || undefined,
+    encerraODia: declarado.encerraODia || undefined,
   };
 
   try {

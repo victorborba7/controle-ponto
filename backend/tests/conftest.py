@@ -369,9 +369,12 @@ async def bater_ponto(
     note: str | None = None,
     idempotency_key: str | None = None,
     client_recorded_at: datetime | None = None,
+    closes_day: bool = False,
     headers: dict | None = None,
 ):
     data: dict[str, str] = {"evidence": evidence if evidence is not None else com_beacon()}
+    if closes_day:
+        data["closes_day"] = "true"
     if entry_type:
         data["entry_type"] = entry_type
     if label is not None:

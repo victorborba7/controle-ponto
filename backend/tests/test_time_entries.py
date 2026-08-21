@@ -285,17 +285,35 @@ async def test_primeira_batida_do_dia_e_entrada(client: AsyncClient, cenario: di
     assert response.json()["entry"]["entry_type"] == "in"
 
 
-async def test_batida_seguinte_alterna_para_saida(
+async def test_batida_seguinte_e_intermediaria(
     client: AsyncClient, db: AsyncSession, cenario: dict
 ):
-    """Deduzir tira do funcionario uma escolha que ele pode errar."""
+    """Ja tendo entrado, a batida do meio do dia nao encerra a jornada.
+
+    Antes a alternancia transformava a segunda batida em saida, e quem so foi
+    ao almoco tinha o dia fechado sem ter pedido.
+    """
     await bater_ponto(client, cenario)
 
     entry = await db.scalar(select(TimeEntry))
     entry.recorded_at = datetime.now(UTC) - timedelta(hours=8)
     await db.commit()
 
-    saida = await bater_ponto(client, cenario)
+    segunda = await bater_ponto(client, cenario)
+    assert segunda.json()["entry"]["entry_type"] == "intermediate"
+
+
+async def test_saida_e_declarada_pelo_funcionario(
+    client: AsyncClient, db: AsyncSession, cenario: dict
+):
+    """So o funcionario sabe se vai voltar — por isso a saida nao se deduz."""
+    await bater_ponto(client, cenario)
+
+    entry = await db.scalar(select(TimeEntry))
+    entry.recorded_at = datetime.now(UTC) - timedelta(hours=8)
+    await db.commit()
+
+    saida = await bater_ponto(client, cenario, closes_day=True)
     assert saida.json()["entry"]["entry_type"] == "out"
 
 

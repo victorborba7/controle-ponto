@@ -142,7 +142,12 @@ def _resolver_rotulo(config: PunchConfig, label: str | None) -> str | None:
             raise PunchInputError(Msg.TIPO_OBRIGATORIO)
         return None
 
-    if config.label_mode is LabelMode.FREE:
+    # Modo de lista sem nenhuma opcao ativa cai para texto livre. Sem isto o
+    # funcionario fica sem saida: texto vazio e recusado por TIPO_OBRIGATORIO e
+    # qualquer texto por TIPO_INEXISTENTE — ninguem bate ponto ate o RH
+    # perceber. Acontece de verdade quando o RH desativa a ultima opcao para
+    # reorganizar a lista.
+    if config.label_mode is LabelMode.FREE or not active_labels(config):
         if len(texto) > LABEL_MAX_LENGTH:
             raise PunchInputError(Msg.TIPO_LONGO, limit=LABEL_MAX_LENGTH)
         return texto
@@ -163,6 +168,11 @@ def _tipo_do_rotulo(config: PunchConfig, label: str | None) -> EntryType | None:
     exatamente a escolha que a deducao automatica existe para evitar.
     """
     if config.label_mode is not LabelMode.LIST:
+        return None
+
+    # Sem opcao ativa nao ha tipo a carregar: o texto que o funcionario digitou
+    # descreve a batida, e a posicao no dia decide o tipo (ver _deduce_entry_type).
+    if not active_labels(config):
         return None
 
     texto = _limpo(label)
