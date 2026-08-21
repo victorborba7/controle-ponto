@@ -150,7 +150,7 @@ async function renovar(): Promise<string | null> {
   return tokens.access_token as string;
 }
 
-async function autenticado(caminho: string, init: RequestInit): Promise<Response> {
+export async function autenticado(caminho: string, init: RequestInit): Promise<Response> {
   const token = await SecureStore.getItemAsync(CHAVE_ACCESS);
 
   const chamar = (bearer: string | null) =>

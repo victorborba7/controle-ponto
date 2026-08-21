@@ -32,6 +32,7 @@ from app.models.punch_config import (
     PunchLabel,
 )
 from app.models.refresh_token import RefreshToken
+from app.models.reminder import PunchReminder
 from app.models.tenant import Tenant
 from app.models.time_entry import TimeEntry
 from app.models.user import User
@@ -60,6 +61,7 @@ __all__ = [
     "NoteMode",
     "PunchConfig",
     "PunchLabel",
+    "PunchReminder",
     "RefreshToken",
     "Site",
     "SubjectType",

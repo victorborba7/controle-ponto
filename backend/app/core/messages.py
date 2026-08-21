@@ -73,6 +73,8 @@ class Msg(StrEnum):
     ROSTO_NAO_CADASTRADO = "face_not_enrolled"
     ROSTO_JA_CADASTRADO = "face_already_enrolled"
     SAIDA_SEM_ENTRADA = "clock_out_without_clock_in"
+    LEMBRETE_TITULO = "reminder_title"
+    LEMBRETE_CORPO = "reminder_body"
     ROSTO_NAO_RECONHECIDO = "face_not_recognized"
     CADASTRO_FACIAL_DESATUALIZADO = "face_enrollment_outdated"
     APARELHO_DESVINCULADO = "device_unlinked"
@@ -147,6 +149,10 @@ CATALOGO: Final[dict[str, dict[Msg, str]]] = {
         ),
         Msg.SAIDA_SEM_ENTRADA: (
             "You have not clocked in today, so there is no shift to close."
+        ),
+        Msg.LEMBRETE_TITULO: "Time to check in",
+        Msg.LEMBRETE_CORPO: (
+            "You clocked in {horas}h ago. Record what you are working on."
         ),
         Msg.ROSTO_NAO_RECONHECIDO: (
             "We did not recognize your face. Try again with better lighting."
@@ -226,6 +232,10 @@ CATALOGO: Final[dict[str, dict[Msg, str]]] = {
         ),
         Msg.SAIDA_SEM_ENTRADA: (
             "Você ainda não bateu entrada hoje, então não há jornada para encerrar."
+        ),
+        Msg.LEMBRETE_TITULO: "Hora de registrar",
+        Msg.LEMBRETE_CORPO: (
+            "Você entrou há {horas}h. Registre o que está fazendo."
         ),
         Msg.ROSTO_NAO_RECONHECIDO: (
             "Não reconhecemos seu rosto. Tente novamente com melhor iluminação."

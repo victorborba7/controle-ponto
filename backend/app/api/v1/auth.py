@@ -7,13 +7,20 @@ sao diferentes.
 """
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import CurrentPrincipal, Locale, SessionDep, erro_http
-from app.core.messages import Msg
+from app.api.deps import (
+    CurrentEmployee,
+    CurrentPrincipal,
+    Locale,
+    SessionDep,
+    erro_http,
+)
+from app.core.messages import IDIOMA_PADRAO, Msg
 from app.core.net import client_ip
-from app.models import Employee, User
+from app.models import Device, Employee, User
 from app.models.enums import SubjectType
 from app.schemas.auth import (
     AdminLoginRequest,
@@ -28,7 +35,7 @@ from app.schemas.auth import (
 )
 from app.services import auth as auth_service
 from app.services import enrollment as enrollment_service
-from app.services import login_throttle
+from app.services import login_throttle, notificacoes
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -234,3 +241,42 @@ async def me(principal: CurrentPrincipal, session: SessionDep) -> MeResponse:
         name=name,
         face_enrolled=face_enrolled,
     )
+
+
+class PushTokenRequest(BaseModel):
+    """Endereco de push do aparelho que esta logado."""
+
+    push_token: str = Field(min_length=1, max_length=500)
+
+
+@router.put("/me/push-token", status_code=status.HTTP_204_NO_CONTENT)
+async def registrar_push_token(
+    payload: PushTokenRequest,
+    principal: CurrentEmployee,
+    session: SessionDep,
+) -> Response:
+    """Guarda o token de push no aparelho da sessao atual.
+
+    PUT e nao POST: o app reenvia a cada login, e o efeito e sempre o mesmo —
+    este aparelho passa a ser alcancavel neste endereco. O token do Expo
+    rotaciona sozinho (reinstalacao, restauracao de backup), entao sobrescrever
+    e o comportamento correto.
+
+    Amarrado ao `device_id` do token de sessao, e nao a um id no corpo: quem
+    escolhe o aparelho e a credencial, senao um funcionario poderia redirecionar
+    os lembretes de outro para o proprio celular.
+    """
+    if principal.device_id is None:
+        raise erro_http(status.HTTP_400_BAD_REQUEST, Msg.FACA_LOGIN_DE_NOVO, IDIOMA_PADRAO)
+
+    device = await session.get(Device, principal.device_id)
+    if device is None or device.employee_id != principal.subject_id:
+        raise erro_http(status.HTTP_403_FORBIDDEN, Msg.FACA_LOGIN_DE_NOVO, IDIOMA_PADRAO)
+
+    if not notificacoes.token_valido(payload.push_token):
+        raise erro_http(status.HTTP_422_UNPROCESSABLE_ENTITY, Msg.APP_DESATUALIZADO, IDIOMA_PADRAO)
+
+    device.push_token = payload.push_token
+    await session.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

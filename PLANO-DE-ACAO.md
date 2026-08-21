@@ -39,6 +39,9 @@
 | D9 | **Validar no Android primeiro**, iOS depois | Android permite sideload de APK sem custo nem aprovação, então o ciclo de teste é imediato. A conta Apple ($99/ano) só é comprada depois que o fluxo estiver provado em Android, evitando gastar antes de validar. Consequência: a Etapa 9 entrega Android primeiro e o iOS vira uma sub-etapa (9b). |
 | D10 | **Configuração de batida por empresa**, não por local | O modo de bater ponto é política da companhia, e um funcionário que circula entre o hangar e o escritório não deveria ver telas diferentes conforme onde está. Por local multiplicaria a manutenção e criaria a pergunta "qual vale?" quando alguém transita. |
 | D11 | **O rótulo escolhido carrega o `entry_type`**, definido pelo RH | O funcionário escolhe "Início do almoço" sem precisar saber o que é `break_start`. A tradução fica com quem entende de jornada. Alternativa descartada: deixar o texto livre decidir o tipo — devolveria ao funcionário exatamente a escolha que a dedução automática existe para evitar (ver D5 e `_deduce_entry_type`). |
+| D13 | **Bater ponto depois da saida REABRE o dia** | Bloquear contradiria o D5 e criaria caminho sem saida no celular de quem voltou ao trabalho as 14h, fora do horario do RH. O motivo mais comum e engano de um toque, e a punicao seria a tarde inteira sem registro. Consequencia: "ultima batida do dia" so se sabe no fim, e a apuracao precisa considerar N pares. |
+| D14 | **Agendador do lembrete roda no processo da API**, com estado no banco | Maquina unica, sem fila, e um job que faz um SELECT a cada 5 minutos: um segundo processo no Fly dobraria o custo de infraestrutura por nada. O preco e que toda implantacao reinicia o agendador — resolvido pondo o relogio em `punch_reminders` em vez da memoria. Reinicio as 9h05 nao reenvia o lembrete das 9h. |
+| D15 | **`business_date` e coluna, nao calculo na consulta** | Converter fuso dentro do WHERE descartaria o indice, e "ja bateu hoje?" passa a rodar em toda batida. Tambem nao e derivavel depois: se a empresa mudar de fuso, o historico tem de continuar dizendo a que dia cada jornada pertenceu **quando aconteceu**. |
 | D12 | **`label` e `note` gravados como texto no ponto**, não como referência ao cadastro | Um ponto é evidência. Se o RH renomear ou apagar a opção no ano que vem, o registro tem de continuar dizendo o que estava escrito na tela quando a pessoa tocou nele. O `entry_type` é o que sustenta a soma de horas; os dois textos descrevem. |
 
 ---
@@ -424,7 +427,8 @@ Postgres + API respondendo.
 | 8 — Painel admin | 🟢 concluída | 2026-07-30 |
 | 9 — App do funcionário (Android) | 🟢 concluída — ponto aprovado com beacon real | 2026-08-02 |
 | 9c — Configuração de batida | 🟢 concluída | 2026-08-03 |
-| 9b — Paridade no iOS | ⚪ não iniciada | |
+| 9b — Paridade no iOS | 🟡 em andamento — App ID, entitlement e build assinado prontos | |
+| 9d — Fluxo de batidas e lembretes | 🟢 concluída | 2026-08-21 |
 | 10 — Liveness | ⚪ não iniciada | |
 | 11 — LGPD | ⚪ não iniciada | |
 | 12 — Deploy | ⚪ não iniciada | |
@@ -466,3 +470,38 @@ Ausência de configuração é o padrão e mantém o comportamento anterior —
 nenhuma empresa que já usa o sistema é afetada. **Critério de pronto:** 27
 testes de backend cobrindo os modos, o congelamento do que foi declarado e as
 configurações que travariam a tela do funcionário.
+
+
+### Etapa 9d — Fluxo de batidas e lembretes (2026-08-21)
+
+O sistema passou a ter **o conceito de dia**. Ate aqui `tenants.timezone`
+existia e ninguem lia: toda consulta era UTC.
+
+Dois defeitos vieram dessa falta, e nenhum dos dois estava previsto:
+
+1. **A deducao de tipo alternava pela ultima batida absoluta.** Quem esquecesse
+   de bater saida na sexta tinha a primeira batida de segunda classificada como
+   *saida* — uma jornada inteira invertida por um esquecimento de dois dias
+   antes.
+2. **Modo de lista com rotulo obrigatorio e nenhuma opcao ativa era beco sem
+   saida.** Texto vazio recusado por `TIPO_OBRIGATORIO`, qualquer texto por
+   `TIPO_INEXISTENTE`. Ninguem batia ponto ate o RH perceber — e acontece de
+   verdade quando ele desativa a ultima opcao para reorganizar a lista.
+
+| Mudanca | Onde |
+|---|---|
+| `business_date` no ponto, no fuso da empresa | `models/time_entry.py`, `services/calendario.py` |
+| Primeira batida do dia e sempre entrada | `_deduce_entry_type` |
+| Saida declarada (`closes_day`), nunca deduzida | `services/time_entry.py` |
+| `EntryType.INTERMEDIATE` | `models/enums.py` |
+| Queda para texto livre sem opcao ativa | `services/punch_config.py` |
+| Lembrete horario por push do Expo | `services/lembretes.py`, `notificacoes.py`, `agendador.py` |
+
+**Multiplas listas de tarefas foram descartadas** por ora: elas exigem uma
+regra de "quem ve qual", e o codigo nao tem departamento, cargo nem unidade —
+o unico eixo e `default_site_id`, e ha um site. Multiplas listas hoje seriam
+varias listas que todo mundo ve, que e o mesmo que uma lista maior.
+
+**Pendencia da fase de notificacao:** a chave APNs precisa estar no EAS
+(`eas credentials --platform ios`). Sem ela o push nao sai no iPhone; o resto
+do mecanismo funciona e esta coberto por teste.

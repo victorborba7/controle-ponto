@@ -29,6 +29,10 @@ primary_region = "iad"
   # comentario em .env.example e app/core/net.py.
   TRUST_PROXY_HEADERS = "true"
   STORAGE_PATH = "/data/storage"
+  # Liga o agendador do lembrete horario. Fica aqui e em lugar nenhum mais: com
+  # ele ligado por padrao, a suite de testes e qualquer `docker compose up` de
+  # desenvolvimento disparariam push de verdade para aparelhos de verdade.
+  SCHEDULER_ENABLED = "true"
 
 [http_service]
   internal_port = 8000

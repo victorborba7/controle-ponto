@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { SafeAreaView, View } from "react-native";
 
 import { encerrarSessao, lerPerfil, salvarPerfil, type Perfil } from "./src/services/api";
+import { registrarParaLembretes } from "./src/services/lembretes";
 import { encerrarBle } from "./src/services/localizacao";
 import { BaterPonto } from "./src/telas/BaterPonto";
 import { CadastroDoRosto } from "./src/telas/CadastroDoRosto";
@@ -102,6 +103,9 @@ export default function App() {
           aoEntrar={(novo) => {
             setPerfil(novo);
             setTela(telaDeQuemEntrou(novo));
+            // Sem await: o lembrete é conveniência, e esperar pela permissão
+            // de notificação atrasaria a tela de quem só quer bater o ponto.
+            void registrarParaLembretes();
           }}
           // Acessível sem login de propósito: na instalação, os beacons são
           // mapeados antes de existir funcionário cadastrado — e quem faz esse

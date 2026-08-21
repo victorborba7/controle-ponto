@@ -80,6 +80,16 @@ class Settings(BaseSettings):
     #   python -c "import base64,os; print(base64.b64encode(os.urandom(32)).decode())"
     storage_encryption_key: str = Field(min_length=44)
 
+    # --- Lembretes de batida ---
+    # Desligado por padrao: ligado, a suite de testes e qualquer ambiente de
+    # desenvolvimento comecariam a disparar push de verdade para aparelhos de
+    # verdade. Producao liga pelo fly.toml.
+    scheduler_enabled: bool = False
+    # A hora de cada funcionario conta a partir da entrada dele, entao "hora
+    # cheia" cai em minutos diferentes para cada um. Este intervalo e o atraso
+    # maximo de um lembrete, nao a frequencia dele.
+    scheduler_interval_minutes: int = 5
+
     # --- CORS ---
     cors_origins: list[str] = ["http://localhost:3000"]
 

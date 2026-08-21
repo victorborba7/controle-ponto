@@ -18,6 +18,7 @@ from app.api.v1 import (
 from app.core.config import settings
 from app.db.session import engine
 from app.facial import get_face_engine
+from app.services import agendador
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,11 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.exception("Falha ao pre-carregar a engine facial; seguindo sem ela.")
 
+    agendador.iniciar()
+
     yield
+
+    agendador.parar()
     await engine.dispose()
 
 

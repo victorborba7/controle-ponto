@@ -19,3 +19,13 @@ argon2-cffi==23.1.0
 pyjwt==2.10.1
 # Criptografia em repouso das imagens de rosto (AES-GCM).
 cryptography==44.0.0
+
+# Cliente HTTP do envio de push (services/notificacoes.py). Sobe para o
+# requirements de runtime porque o agendador roda em producao; ate aqui httpx
+# so existia como dependencia de teste.
+httpx==0.28.1
+
+# Agendador do lembrete horario, no proprio processo da API. Maquina unica e
+# sem fila: um segundo processo no Fly dobraria o custo para um job que roda um
+# SELECT a cada poucos minutos.
+apscheduler==3.11.0

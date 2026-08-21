@@ -55,6 +55,7 @@
     "plugins": [
       "./plugins/withVarreduraDeBeacon",
       "expo-secure-store",
+      "expo-notifications",
       "expo-dev-client",
       [
         "expo-camera",
