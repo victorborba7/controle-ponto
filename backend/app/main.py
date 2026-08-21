@@ -20,6 +20,15 @@ from app.db.session import engine
 from app.facial import get_face_engine
 from app.services import agendador
 
+# Configurada no import, antes de qualquer logger ser usado. O uvicorn monta os
+# proprios handlers e nao toca na raiz, entao sem isto `logger.info` do codigo
+# da aplicacao nao chega a lugar nenhum — e um agendador silencioso e
+# indistinguivel de um agendador parado.
+logging.basicConfig(
+    level=settings.log_level,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+
 logger = logging.getLogger(__name__)
 
 

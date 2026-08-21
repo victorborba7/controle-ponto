@@ -80,6 +80,11 @@ class Settings(BaseSettings):
     #   python -c "import base64,os; print(base64.b64encode(os.urandom(32)).decode())"
     storage_encryption_key: str = Field(min_length=44)
 
+    # Nivel dos logs da aplicacao. O uvicorn configura apenas os loggers dele;
+    # sem ajustar a raiz, todo `logger.info` do codigo cai no vazio — e o
+    # agendador fica sem como provar que rodou.
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+
     # --- Lembretes de batida ---
     # Desligado por padrao: ligado, a suite de testes e qualquer ambiente de
     # desenvolvimento comecariam a disparar push de verdade para aparelhos de
