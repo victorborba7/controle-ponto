@@ -1,42 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, RefreshControl, Text, View } from "react-native";
 
+import { t, tCodigo } from "../i18n";
 import { get } from "../services/api";
 import { Aviso, Botao, Cartao, Legenda, Titulo, cores } from "../ui";
 
 type Registro = {
   id: string;
-  entry_type: "in" | "out" | "break_start" | "break_end";
+  entry_type: "in" | "out" | "intermediate" | "break_start" | "break_end";
   recorded_at: string;
   status: "approved" | "pending_review" | "rejected";
   location_method: "beacon" | "wifi" | "gps" | "none";
   decision_reason: string | null;
 };
 
-const rotuloTipo: Record<Registro["entry_type"], string> = {
-  in: "Entrada",
-  out: "Saída",
-  break_start: "Início do intervalo",
-  break_end: "Fim do intervalo",
-};
-
-const rotuloStatus: Record<Registro["status"], string> = {
-  approved: "Aprovado",
-  pending_review: "Em conferência",
-  rejected: "Rejeitado",
-};
-
 const corStatus: Record<Registro["status"], string> = {
   approved: cores.acento,
   pending_review: cores.aviso,
   rejected: cores.erro,
-};
-
-const rotuloMetodo: Record<Registro["location_method"], string> = {
-  beacon: "Beacon do local",
-  wifi: "Wi-Fi do local",
-  gps: "GPS",
-  none: "Sem sinal de local",
 };
 
 function formatar(iso: string) {
@@ -60,7 +41,7 @@ export function Historico({ aoVoltar }: { aoVoltar: () => void }) {
       const resposta = await get<{ items: Registro[] }>("/time-entries/me?limit=100");
       setRegistros(resposta.items);
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Falha ao carregar");
+      setErro(e instanceof Error ? e.message : t("historico.falhaCarregar"));
     } finally {
       setCarregando(false);
     }
@@ -73,7 +54,7 @@ export function Historico({ aoVoltar }: { aoVoltar: () => void }) {
   return (
     <View style={{ flex: 1, backgroundColor: cores.fundo }}>
       <View style={{ padding: 16, paddingTop: 24 }}>
-        <Titulo>Meus registros</Titulo>
+        <Titulo>{t("historico.titulo")}</Titulo>
       </View>
 
       {erro && (
@@ -95,7 +76,7 @@ export function Historico({ aoVoltar }: { aoVoltar: () => void }) {
         }
         ListEmptyComponent={
           carregando ? null : (
-            <Legenda>Nenhum registro ainda.</Legenda>
+            <Legenda>{t("historico.vazio")}</Legenda>
           )
         }
         renderItem={({ item }) => (
@@ -108,10 +89,10 @@ export function Historico({ aoVoltar }: { aoVoltar: () => void }) {
               }}
             >
               <Text style={{ color: cores.texto, fontSize: 16, fontWeight: "600" }}>
-                {rotuloTipo[item.entry_type]}
+                {tCodigo("tipo", item.entry_type)}
               </Text>
               <Text style={{ color: corStatus[item.status], fontSize: 13, fontWeight: "600" }}>
-                {rotuloStatus[item.status]}
+                {tCodigo("status", item.status)}
               </Text>
             </View>
 
@@ -120,7 +101,7 @@ export function Historico({ aoVoltar }: { aoVoltar: () => void }) {
             </Text>
 
             <Text style={{ color: cores.textoFraco, fontSize: 13, marginTop: 2 }}>
-              {rotuloMetodo[item.location_method]}
+              {tCodigo("metodo", item.location_method)}
             </Text>
 
             {/* O motivo aparece só quando não foi aprovado direto: é a resposta
@@ -135,7 +116,7 @@ export function Historico({ aoVoltar }: { aoVoltar: () => void }) {
       />
 
       <View style={{ padding: 16 }}>
-        <Botao titulo="Voltar" variante="secundario" onPress={aoVoltar} />
+        <Botao titulo={t("ponto.voltar")} variante="secundario" onPress={aoVoltar} />
       </View>
     </View>
   );

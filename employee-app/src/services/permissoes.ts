@@ -25,6 +25,8 @@
 
 import { PermissionsAndroid, Platform } from "react-native";
 
+import { t } from "../i18n";
+
 export type ResultadoPermissao = {
   concedida: boolean;
   /** Mensagem para a tela quando faltar algo. */
@@ -64,15 +66,11 @@ export async function garantirPermissoesBluetooth(): Promise<ResultadoPermissao>
       return {
         concedida: false,
         motivo: soLocalizacao
-          ? "Falta a permissão de localização. O Android a exige para entregar " +
-            "os anúncios dos beacons — sem ela a varredura acha celulares e " +
-            "fones, mas nenhum beacon." +
-            (permanente
-              ? " Libere em Ajustes → Aplicativos → Waypoint → Permissões → Localização."
-              : "")
+          ? t("sinal.faltaLocalParaBle") +
+            (permanente ? t("sinal.libereLocalNosAjustes") : "")
           : permanente
-            ? "Permissão de Bluetooth negada. Libere em Ajustes → Aplicativos → Waypoint → Permissões."
-            : "Sem permissão de Bluetooth não é possível detectar os beacons do local.",
+            ? t("sinal.bluetoothNegadoAjustes")
+            : t("sinal.bluetoothNegado"),
       };
     }
     return { concedida: true };
@@ -87,8 +85,7 @@ export async function garantirPermissoesBluetooth(): Promise<ResultadoPermissao>
   if (resposta !== PermissionsAndroid.RESULTS.GRANTED) {
     return {
       concedida: false,
-      motivo:
-        "Nesta versão do Android, a permissão de localização é o que libera a leitura dos beacons.",
+      motivo: t("sinal.androidLocalLiberaBeacon"),
     };
   }
   return { concedida: true };

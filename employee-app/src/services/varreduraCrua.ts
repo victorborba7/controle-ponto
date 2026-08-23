@@ -14,6 +14,8 @@ import { BleManager, ScanMode, State as BleState } from "react-native-ble-plx";
 
 import { lerEddystone } from "./eddystone";
 import { lerIBeacon } from "./ibeacon";
+import { t } from "../i18n";
+
 import { garantirPermissoesBluetooth } from "./permissoes";
 
 export type DispositivoCru = {
@@ -81,9 +83,9 @@ export function tipoDeEndereco(mac: string): string {
 
   switch (primeiro >> 6) {
     case 0b10:
-      return "público (fixo)";
+      return t("diag.macPublico");
     case 0b11:
-      return "fixo, ou público";
+      return t("diag.macFixoOuPublico");
     default:
       // 01 e 00 são os padrões de endereço privado, que rotaciona.
       return "possivelmente rotativo";
@@ -226,7 +228,7 @@ export async function varrerCru(
       dispositivos: [],
       anunciosRecebidos: 0,
       duracaoMs,
-      erro: permissao.motivo ?? "Sem permissão de Bluetooth",
+      erro: permissao.motivo ?? t("diag.semPermissaoBluetooth"),
       parametros,
     };
   }
@@ -419,8 +421,7 @@ export function compararPassadas(
 
   if (reconhecidos === 0) {
     conclusoes.push(
-      "Nenhum beacon reconhecido em nenhuma das duas passadas — o parâmetro " +
-        "legacy não é a causa. O anúncio não está chegando ao app.",
+      t("diag.legacyNaoEACausa"),
     );
   }
 

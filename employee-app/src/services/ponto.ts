@@ -4,6 +4,8 @@
 
 import { File } from "expo-file-system";
 
+import { t } from "../i18n";
+
 import { ApiError, enviarMultipart } from "./api";
 import {
   type BatidaPendente,
@@ -87,7 +89,7 @@ async function montarFormulario(batida: BatidaPendente): Promise<FormData> {
     // Acontece com batida represada: a foto fica no cache, e o Android pode
     // limpá-lo. Falhar aqui com o motivo certo evita reenviar para sempre uma
     // batida que nunca vai completar.
-    throw new ApiError("A foto desta batida não está mais no aparelho.", 422);
+    throw new ApiError(t("erro.fotoSumiuDaBatida"), 422);
   }
   dados.append("selfie", arquivo as unknown as Blob);
 
@@ -147,7 +149,7 @@ export async function baterPonto(
     return {
       situacao: "enfileirado",
       motivo:
-        erro instanceof Error ? erro.message : "Sem conexão com o servidor",
+        erro instanceof Error ? erro.message : t("erro.semConexaoServidor"),
       ehFalhaDeRede: ehFalhaDeRede(erro),
     };
   }
@@ -197,7 +199,7 @@ export async function sincronizar(): Promise<ResultadoSincronizacao> {
       }
       await registrarFalha(
         batida.idempotencyKey,
-        erro instanceof Error ? erro.message : "Falha no envio",
+        erro instanceof Error ? erro.message : t("erro.falhaEnvio"),
       );
       // Sem conexão agora significa sem conexão para as próximas; insistir na
       // fila inteira só gastaria bateria.

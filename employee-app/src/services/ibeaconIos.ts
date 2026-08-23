@@ -25,6 +25,8 @@
 
 import { Platform } from "react-native";
 
+import { t } from "../i18n";
+
 import { consolidarIBeacons, type LeituraIBeacon } from "./ibeacon";
 
 export type ResultadoIBeaconIos = {
@@ -53,8 +55,7 @@ export async function varrerIBeaconsIos(
     return {
       leituras: [],
       aviso:
-        "Nenhum iBeacon cadastrado neste local. No iPhone é preciso conhecer o " +
-        "UUID de antemão — o iOS não varre iBeacon genericamente.",
+        t("sinal.semIBeaconCadastrado"),
     };
   }
 
@@ -66,7 +67,7 @@ export async function varrerIBeaconsIos(
     // segue funcionando pelos outros elos da cadeia.
     return {
       leituras: [],
-      aviso: "Leitura de iBeacon indisponível nesta versão do app.",
+      aviso: t("sinal.iBeaconIndisponivel"),
     };
   }
 
@@ -76,8 +77,7 @@ export async function varrerIBeaconsIos(
       return {
         leituras: [],
         aviso:
-          "Sem permissão de localização, o iPhone não entrega os beacons. " +
-          "Libere em Ajustes → Waypoint → Localização.",
+          t("sinal.iosSemPermissaoLocal"),
       };
     }
 

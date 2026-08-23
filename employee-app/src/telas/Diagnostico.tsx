@@ -2,6 +2,7 @@ import * as Clipboard from "expo-clipboard";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
+import { t } from "../i18n";
 import { sincronizarConfig, uuidsIBeaconConhecidos } from "../services/configLocal";
 import {
   coletarSinais,
@@ -60,11 +61,11 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
       const beacons = locais.reduce((total, local) => total + local.beacons.length, 0);
       const uuids = uuidsIBeaconConhecidos(locais).length;
       setResumoConfig(
-        `${locais.length} local(is), ${beacons} beacon(s) cadastrado(s)` +
-          (Platform.OS === "ios" ? ` · ${uuids} UUID(s) de iBeacon para procurar` : ""),
+        t("diag.resumoCadastro", { locais: locais.length, beacons }) +
+          (Platform.OS === "ios" ? t("diag.resumoUuids", { uuids }) : ""),
       );
     } catch {
-      setResumoConfig("Nao foi possivel atualizar — sem rede? O cache anterior segue valendo.");
+      setResumoConfig(t("diag.falhaAtualizar"));
     } finally {
       setSincronizando(false);
     }
@@ -150,14 +151,14 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
     setSinais(null);
     setVistos([]);
     setCopiado(null);
-    setEtapa("Procurando…");
+    setEtapa(t("diag.procurando"));
     try {
       const resumo = await coletarSinais((p) => setEtapa(p.detalhe || null));
       setSinais(resumo.sinais);
       setVistos(resumo.vistos);
       setAvisos(resumo.avisos);
     } catch {
-      setAvisos(["Falha ao varrer os sinais."]);
+      setAvisos([t("diag.falhaVarrer")]);
     } finally {
       setEtapa(null);
     }
@@ -172,7 +173,7 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
     <View style={{ flex: 1, backgroundColor: cores.fundo }}>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
         <View>
-          <Titulo>Diagnóstico do local</Titulo>
+          <Titulo>{t("diag.titulo")}</Titulo>
           <Legenda>
             Aproxime o celular do beacon e toque em varrer. Os identificadores
             que aparecerem são os que devem ser cadastrados no painel.
@@ -195,20 +196,20 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
         )}
 
         <Botao
-          titulo={etapa ?? "Varrer sinais"}
+          titulo={etapa ?? t("diag.varrer")}
           onPress={varrer}
           carregando={etapa !== null}
         />
 
         <Botao
-          titulo={cru ? "Varrer de novo (12s, cru)" : "Varredura crua (12s)"}
+          titulo={cru ? t("diag.varrerDeNovo") : t("diag.varreduraCrua")}
           variante="secundario"
           onPress={varrerCruamente}
           carregando={varrendoCru}
         />
 
         <Botao
-          titulo="Comparar parâmetros (2 × 8s)"
+          titulo={t("diag.compararParametros")}
           variante="secundario"
           onPress={compararParametros}
           carregando={comparando}
@@ -219,7 +220,7 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
             e no iPhone esperar nao e lentidao, e cegueira: sem o UUID em maos o
             CoreLocation nem chega a procurar. */}
         <Botao
-          titulo="Atualizar cadastro do local"
+          titulo={t("diag.atualizarCadastro")}
           variante="secundario"
           onPress={sincronizar}
           carregando={sincronizando}
@@ -278,7 +279,7 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
             >
               {reconhecidos > 0
                 ? `${reconhecidos} reconhecido(s) como beacon — aparecem no topo`
-                : "Nenhum anúncio de beacon entre eles"}
+                : t("diag.nenhumAnuncio")}
             </Text>
 
             <Text style={{ color: cores.textoFraco, fontSize: 12, marginTop: 8 }}>
@@ -295,7 +296,7 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
             onChangeText={setFiltro}
             autoCapitalize="none"
             autoCorrect={false}
-            placeholder="Filtrar por MAC, nome ou bytes do anúncio"
+            placeholder={t("diag.filtrar")}
             placeholderTextColor={cores.textoFraco}
           />
         )}
@@ -345,7 +346,8 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
                   quando o endereço rotaciona, e é o que permite reconhecê-lo
                   comparando com o que o nRF Connect mostra. */}
               <Text style={{ color: cores.textoFraco, fontSize: 13, marginTop: 4 }}>
-                {d.nome ?? d.nomeLocal ?? "(sem nome)"} · {d.anuncios} anúncio(s)
+                {d.nome ?? d.nomeLocal ?? t("diag.semNome")} ·{" "}
+                {t("diag.anuncios", { n: d.anuncios })}
                 {d.intervaloMs !== null ? ` · a cada ~${d.intervaloMs} ms` : ""}
               </Text>
 
@@ -401,7 +403,7 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
               )}
 
               <Text style={{ color: cores.textoFraco, fontSize: 12, marginTop: 6 }}>
-                {copiado === `cru-${d.id}` ? "Copiado!" : "Toque para copiar o MAC"}
+                {copiado === `cru-${d.id}` ? t("diag.copiado") : t("diag.toqueParaCopiarMac")}
               </Text>
             </Cartao>
           </Pressable>
@@ -467,8 +469,8 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
 
                         <Text style={{ color: cores.textoFraco, fontSize: 12, marginTop: 8 }}>
                           {copiado === `beacon-${indice}`
-                            ? "Copiado!"
-                            : "Toque para copiar"}
+                            ? t("diag.copiado")
+                            : t("diag.toqueParaCopiar")}
                           {"  ·  "}
                           {sugerirLimiar(beacon.rssi)}
                         </Text>
@@ -504,10 +506,10 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
                         }}
                         selectable
                       >
-                        {rede.bssid ?? "BSSID não disponível"}
+                        {rede.bssid ?? t("diag.semBssid")}
                       </Text>
                       <Text style={{ color: cores.textoFraco, fontSize: 12, marginTop: 8 }}>
-                        {copiado === "wifi" ? "Copiado!" : "Toque para copiar"}
+                        {copiado === "wifi" ? t("diag.copiado") : t("diag.toqueParaCopiar")}
                       </Text>
                     </Cartao>
                   </Pressable>
@@ -549,12 +551,12 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
                     </View>
 
                     <Text style={{ color: cores.textoFraco, fontSize: 13, marginTop: 4 }}>
-                      {d.nome ?? "(sem nome)"}
+                      {d.nome ?? t("diag.semNome")}
                       {d.reconhecido ? ` · ${d.reconhecido.toUpperCase()}` : ""}
                     </Text>
 
                     <Text style={{ color: cores.textoFraco, fontSize: 12, marginTop: 6 }}>
-                      {copiado === `mac-${d.mac}` ? "MAC copiado!" : "Toque para copiar o MAC"}
+                      {copiado === `mac-${d.mac}` ? t("diag.macCopiado") : t("diag.toqueParaCopiarMac")}
                       {"  ·  "}
                       {sugerirLimiar(d.rssi)}
                     </Text>
@@ -589,7 +591,7 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
                       precisão ±{Math.round(sinais.gps.accuracy_m)} m
                     </Text>
                     <Text style={{ color: cores.textoFraco, fontSize: 12, marginTop: 8 }}>
-                      {copiado === "gps" ? "Copiado!" : "Toque para copiar"}
+                      {copiado === "gps" ? t("diag.copiado") : t("diag.toqueParaCopiar")}
                     </Text>
                   </Cartao>
                 </Pressable>
@@ -602,7 +604,7 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
       </ScrollView>
 
       <View style={{ padding: 16 }}>
-        <Botao titulo="Voltar" variante="secundario" onPress={aoVoltar} />
+        <Botao titulo={t("ponto.voltar")} variante="secundario" onPress={aoVoltar} />
       </View>
     </View>
   );
@@ -611,7 +613,7 @@ export function Diagnostico({ aoVoltar }: { aoVoltar: () => void }) {
 const rotuloDoProtocolo = {
   eddystone: "EDDYSTONE-UID",
   ibeacon: "IBEACON",
-  mac: "ENDEREÇO MAC",
+  mac: t("diag.enderecoMac"),
 } as const;
 
 const corDoProtocolo = {

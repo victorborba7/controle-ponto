@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import * as Application from "expo-application";
 
+import { t } from "../i18n";
 import { entrar, type Perfil } from "../services/api";
 import { Aviso, Botao, Legenda, Titulo, cores, estilosCampo } from "../ui";
 
@@ -40,7 +41,7 @@ export function Login({
       });
       aoEntrar(perfil);
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não foi possível entrar");
+      setErro(e instanceof Error ? e.message : t("login.falhou"));
     } finally {
       setEnviando(false);
     }
@@ -59,7 +60,7 @@ export function Login({
       >
         <View style={{ marginBottom: 32, alignItems: "center" }}>
           <Titulo>Waypoint</Titulo>
-          <Legenda>Entre para registrar seu ponto</Legenda>
+          <Legenda>{t("login.subtitulo")}</Legenda>
         </View>
 
         {erro && (
@@ -70,7 +71,7 @@ export function Login({
 
         <View style={{ gap: 16 }}>
           <View>
-            <Text style={estilosCampo.rotulo}>Código da empresa</Text>
+            <Text style={estilosCampo.rotulo}>{t("login.empresa")}</Text>
             <TextInput
               style={estilosCampo.entrada}
               value={empresa}
@@ -83,7 +84,7 @@ export function Login({
           </View>
 
           <View>
-            <Text style={estilosCampo.rotulo}>Matrícula</Text>
+            <Text style={estilosCampo.rotulo}>{t("login.matricula")}</Text>
             <TextInput
               style={estilosCampo.entrada}
               value={matricula}
@@ -96,7 +97,7 @@ export function Login({
           </View>
 
           <View>
-            <Text style={estilosCampo.rotulo}>Senha</Text>
+            <Text style={estilosCampo.rotulo}>{t("login.senha")}</Text>
             <TextInput
               style={estilosCampo.entrada}
               value={senha}
@@ -107,7 +108,7 @@ export function Login({
           </View>
 
           <Botao
-            titulo="Entrar"
+            titulo={t("login.entrar")}
             onPress={autenticar}
             carregando={enviando}
             desabilitado={!podeEnviar}
@@ -115,10 +116,10 @@ export function Login({
         </View>
 
         <View style={{ marginTop: 32, gap: 16 }}>
-          <Legenda>Não sabe seu código de empresa ou senha? Procure o RH.</Legenda>
+          <Legenda>{t("login.ajuda")}</Legenda>
 
           <Botao
-            titulo="Diagnóstico do local"
+            titulo={t("login.diagnostico")}
             variante="texto"
             onPress={aoAbrirDiagnostico}
           />

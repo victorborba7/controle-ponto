@@ -14,6 +14,8 @@
 import NetInfo from "@react-native-community/netinfo";
 import * as Location from "expo-location";
 import { Platform } from "react-native";
+
+import { t } from "../i18n";
 import { BleManager, State as BleState, ScanMode } from "react-native-ble-plx";
 
 import {
@@ -152,7 +154,7 @@ async function coletarBeacons(
   // parece defeito de hardware e nao e.
   const permissao = await garantirPermissoesBluetooth();
   if (!permissao.concedida) {
-    avisos.push(permissao.motivo ?? "Sem permissão de Bluetooth.");
+    avisos.push(permissao.motivo ?? t("sinal.semPermissaoBluetooth"));
     return vazio;
   }
 
@@ -160,7 +162,7 @@ async function coletarBeacons(
 
   const estado = await ble.state();
   if (estado !== BleState.PoweredOn) {
-    avisos.push("Bluetooth desligado — ligue para detectar os beacons do local.");
+    avisos.push(t("sinal.bluetoothDesligado"));
     return vazio;
   }
 
@@ -220,7 +222,7 @@ async function coletarBeacons(
           avisos.push(
             detalhe
               ? `Falha na varredura Bluetooth: ${detalhe}`
-              : "Falha na varredura Bluetooth.",
+              : t("sinal.falhaVarredura"),
           );
           clearTimeout(relogio);
           finalizar();
@@ -275,7 +277,7 @@ async function coletarWifi(avisos: string[]) {
       // Acontece quando falta permissão de localização (Android 10+) ou a
       // entitlement de Wi-Fi (iOS). Vale avisar: sem isso o elo do meio da
       // cadeia fica silenciosamente vazio.
-      avisos.push("Rede Wi-Fi não identificada — verifique a permissão de localização.");
+      avisos.push(t("sinal.wifiNaoIdentificado"));
       return [];
     }
 
@@ -305,7 +307,7 @@ async function coletarGps(avisos: string[]) {
     ]);
 
     if (!posicao) {
-      avisos.push("Não foi possível obter a localização a tempo.");
+      avisos.push(t("sinal.gpsDemorou"));
       return undefined;
     }
 
@@ -340,7 +342,7 @@ export async function coletarSinais(
   // em que ela mais importa.
   const locais = await sincronizarConfig();
 
-  aoProgredir?.({ etapa: "bluetooth", detalhe: "Procurando beacons do local…" });
+  aoProgredir?.({ etapa: "bluetooth", detalhe: t("ponto.procurandoBeacons") });
 
   // No iPhone o `device.id` do BLE é um identificador rotativo por app, não o
   // endereço do rádio. Passar a lista de MACs conhecidos ali não filtraria
@@ -379,13 +381,13 @@ export async function coletarSinais(
 
   if (iosIBeacons.aviso) avisos.push(iosIBeacons.aviso);
 
-  aoProgredir?.({ etapa: "wifi", detalhe: "Verificando a rede Wi-Fi…" });
+  aoProgredir?.({ etapa: "wifi", detalhe: t("sinal.verificandoWifi") });
   const wifi = await coletarWifi(avisos);
 
   // O GPS roda mesmo com beacon encontrado, e de propósito: o backend cruza os
   // dois para detectar incoerência — um beacon do hangar "visto" de outra
   // cidade denuncia um anúncio falsificado.
-  aoProgredir?.({ etapa: "gps", detalhe: "Obtendo a localização…" });
+  aoProgredir?.({ etapa: "gps", detalhe: t("sinal.obtendoLocalizacao") });
   const gps = await coletarGps(avisos);
 
   const relatados: BeaconRelatado[] = [
@@ -446,5 +448,5 @@ function descrever(sinais: SinaisColetados): string {
   if (sinais.gps) {
     return `Localização por GPS (±${Math.round(sinais.gps.accuracy_m)} m)`;
   }
-  return "Nenhum sinal de localização detectado";
+  return t("sinal.nenhum");
 }

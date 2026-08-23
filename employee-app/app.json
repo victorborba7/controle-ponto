@@ -100,7 +100,8 @@
             "bluetoothPermission": "O Bluetooth detecta os beacons instalados no local de trabalho para confirmar sua presença."
           }
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "extra": {
       "eas": {

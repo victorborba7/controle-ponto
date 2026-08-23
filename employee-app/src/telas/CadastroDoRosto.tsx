@@ -2,6 +2,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef, useState } from "react";
 import { Image, ScrollView, Text, View } from "react-native";
 
+import { t } from "../i18n";
 import type { Perfil } from "../services/api";
 import {
   MINIMO_DE_FOTOS,
@@ -25,19 +26,13 @@ import { VERSAO_DO_TERMO } from "./Consentimento";
  * repetir "tire uma foto".
  */
 
+// As chaves, e não os textos: `PASSOS` é constante de módulo e seria montada
+// antes de qualquer render, congelando o idioma de forma correta mas frágil —
+// traduzir na hora de exibir deixa isso óbvio para quem mexer depois.
 const PASSOS = [
-  {
-    titulo: "Olhando para a câmera",
-    instrucao: "Rosto centralizado, luz no rosto e sem boné ou óculos escuros.",
-  },
-  {
-    titulo: "Um pouco mais perto",
-    instrucao: "Aproxime o celular até o rosto ocupar quase todo o círculo.",
-  },
-  {
-    titulo: "Expressão natural",
-    instrucao: "Afaste de novo e relaxe o rosto, como você estaria no dia a dia.",
-  },
+  { titulo: "cadastro.passo1.titulo", instrucao: "cadastro.passo1.instrucao" },
+  { titulo: "cadastro.passo2.titulo", instrucao: "cadastro.passo2.instrucao" },
+  { titulo: "cadastro.passo3.titulo", instrucao: "cadastro.passo3.instrucao" },
 ] as const;
 
 type Estado =
@@ -72,7 +67,7 @@ export function CadastroDoRosto({
       setFotos((atuais) => [...atuais, foto.uri]);
       setEstado({ nome: "capturando" });
     } catch {
-      setEstado({ nome: "erro", mensagem: "Não foi possível capturar a foto." });
+      setEstado({ nome: "erro", mensagem: t("ponto.falhaFoto") });
     }
   }
 
@@ -89,7 +84,7 @@ export function CadastroDoRosto({
       setFotos([]);
       setEstado({
         nome: "erro",
-        mensagem: erro instanceof Error ? erro.message : "Não foi possível cadastrar.",
+        mensagem: erro instanceof Error ? erro.message : t("cadastro.falhou"),
       });
     }
   }
@@ -97,7 +92,7 @@ export function CadastroDoRosto({
   if (!permissao) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <Legenda>Verificando a câmera…</Legenda>
+        <Legenda>{t("cadastro.verificandoCamera")}</Legenda>
       </View>
     );
   }
@@ -105,15 +100,14 @@ export function CadastroDoRosto({
   if (!permissao.granted) {
     return (
       <ScrollView contentContainerStyle={{ padding: 24, gap: 16 }}>
-        <Titulo>Cadastro do seu rosto</Titulo>
+        <Titulo>{t("cadastro.tituloPermissao")}</Titulo>
         <Cartao>
           <Text style={{ color: cores.textoFraco, lineHeight: 21 }}>
-            Para cadastrar seu rosto, o aplicativo precisa da câmera. Ela é usada
-            só neste cadastro e no momento de bater o ponto.
+            {t("cadastro.explicacaoCamera")}
           </Text>
         </Cartao>
-        <Botao titulo="Permitir câmera" onPress={pedirPermissao} />
-        <Botao titulo="Sair" variante="secundario" onPress={aoSair} />
+        <Botao titulo={t("permissao.camera.permitir")} onPress={pedirPermissao} />
+        <Botao titulo={t("ponto.sair")} variante="secundario" onPress={aoSair} />
       </ScrollView>
     );
   }
@@ -123,7 +117,7 @@ export function CadastroDoRosto({
   return (
     <View style={{ flex: 1 }}>
       <View style={{ paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 }}>
-        <Titulo>Cadastre seu rosto</Titulo>
+        <Titulo>{t("cadastro.titulo")}</Titulo>
         <Legenda>
           {perfil.nome} · {perfil.empresa}
         </Legenda>
@@ -132,9 +126,13 @@ export function CadastroDoRosto({
       {!completo && (
         <View style={{ paddingHorizontal: 24, paddingBottom: 8 }}>
           <Text style={{ color: cores.texto, fontWeight: "700" }}>
-            Foto {fotos.length + 1} de {MINIMO_DE_FOTOS} — {passo.titulo}
+            {t("cadastro.contador", {
+              atual: fotos.length + 1,
+              total: MINIMO_DE_FOTOS,
+              passo: t(passo.titulo),
+            })}
           </Text>
-          <Legenda>{passo.instrucao}</Legenda>
+          <Legenda>{t(passo.instrucao)}</Legenda>
         </View>
       )}
 
@@ -182,20 +180,20 @@ export function CadastroDoRosto({
         {estado.nome === "erro" && <Aviso tipo="erro">{estado.mensagem}</Aviso>}
 
         {!completo ? (
-          <Botao titulo="Tirar foto" onPress={capturar} />
+          <Botao titulo={t("cadastro.tirarFoto")} onPress={capturar} />
         ) : (
           <Botao
-            titulo={ocupado ? "Enviando…" : "Concluir cadastro"}
+            titulo={ocupado ? t("cadastro.enviando") : t("cadastro.concluir")}
             onPress={enviar}
             carregando={ocupado}
           />
         )}
 
         {fotos.length > 0 && !ocupado && (
-          <Botao titulo="Recomeçar" variante="secundario" onPress={() => setFotos([])} />
+          <Botao titulo={t("cadastro.recomecar")} variante="secundario" onPress={() => setFotos([])} />
         )}
 
-        {!ocupado && <Botao titulo="Sair" variante="secundario" onPress={aoSair} />}
+        {!ocupado && <Botao titulo={t("ponto.sair")} variante="secundario" onPress={aoSair} />}
       </View>
     </View>
   );

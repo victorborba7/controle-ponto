@@ -19,6 +19,7 @@ import {
   type ProgressoColeta,
   type ResumoColeta,
 } from "../services/localizacao";
+import { t } from "../i18n";
 import { baterPonto, sincronizar } from "../services/ponto";
 import { Aviso, Botao, Cartao, Legenda, Titulo, cores, estilosCampo } from "../ui";
 
@@ -115,7 +116,7 @@ export function BaterPonto({
       return;
     }
 
-    setEtapa({ nome: "coletando", detalhe: "Procurando beacons do local…" });
+    setEtapa({ nome: "coletando", detalhe: t("ponto.procurandoBeacons") });
 
     let resumo: ResumoColeta;
     try {
@@ -123,7 +124,7 @@ export function BaterPonto({
         setEtapa({ nome: "coletando", detalhe: p.detalhe }),
       );
     } catch {
-      setEtapa({ nome: "erro", mensagem: "Falha ao ler os sinais do local." });
+      setEtapa({ nome: "erro", mensagem: t("ponto.falhaSinais") });
       return;
     }
 
@@ -138,7 +139,7 @@ export function BaterPonto({
       if (!foto?.uri) throw new Error("sem foto");
       fotoUri = foto.uri;
     } catch {
-      setEtapa({ nome: "erro", mensagem: "Não foi possível capturar a foto." });
+      setEtapa({ nome: "erro", mensagem: t("ponto.falhaFoto") });
       return;
     }
 
@@ -163,7 +164,11 @@ export function BaterPonto({
         // que ela leu na tela, e é como ela vai conferir se bateu o certo.
         titulo:
           entry.label ??
-          (entry.entry_type === "in" ? "Entrada registrada" : "Saída registrada"),
+          (entry.entry_type === "in"
+            ? t("ponto.entradaRegistrada")
+            : entry.entry_type === "out"
+              ? t("ponto.saidaRegistrada")
+              : t("ponto.registroRegistrado")),
         mensagem: resultado.resposta.message,
         tipo: entry.status === "approved" ? "sucesso" : "aviso",
       });
@@ -180,9 +185,9 @@ export function BaterPonto({
       // muda o que se deve fazer a respeito.
       setEtapa({
         nome: "concluido",
-        titulo: "Ponto guardado",
+        titulo: t("ponto.guardado"),
         mensagem: resultado.ehFalhaDeRede
-          ? "Sem conexão agora. O registro foi salvo com o horário de agora e será enviado assim que houver sinal."
+          ? t("ponto.semConexao")
           : `O registro foi salvo com o horário de agora e será reenviado, mas o servidor não aceitou o envio: ${resultado.motivo}`,
         tipo: "aviso",
       });
@@ -195,20 +200,17 @@ export function BaterPonto({
   // ---- Permissões ----
 
   if (!permissaoCamera) {
-    return <Centralizado><Legenda>Verificando permissões…</Legenda></Centralizado>;
+    return <Centralizado><Legenda>{t("ponto.verificandoPermissoes")}</Legenda></Centralizado>;
   }
 
   if (!permissaoCamera.granted) {
     return (
       <Centralizado>
-        <Titulo>Permissão da câmera</Titulo>
+        <Titulo>{t("permissao.camera.titulo")}</Titulo>
         <View style={{ marginVertical: 16 }}>
-          <Legenda>
-            O reconhecimento facial é o que comprova que foi você quem bateu o
-            ponto. Sem acesso à câmera, o registro não pode ser feito.
-          </Legenda>
+          <Legenda>{t("permissao.camera.explicacao")}</Legenda>
         </View>
-        <Botao titulo="Permitir câmera" onPress={pedirPermissaoCamera} />
+        <Botao titulo={t("permissao.camera.permitir")} onPress={pedirPermissaoCamera} />
       </Centralizado>
     );
   }
@@ -216,19 +218,12 @@ export function BaterPonto({
   if (permissaoLocalizacao === false) {
     return (
       <Centralizado>
-        <Titulo>Permissão de localização</Titulo>
+        <Titulo>{t("permissao.local.titulo")}</Titulo>
         <View style={{ marginVertical: 16, gap: 12 }}>
-          <Legenda>
-            A localização confirma que você está no local de trabalho. Ela é
-            usada apenas no momento da batida — o app não acompanha seus
-            deslocamentos.
-          </Legenda>
-          <Legenda>
-            No Android, esta permissão também é o que libera a leitura dos
-            beacons e da rede Wi-Fi do local.
-          </Legenda>
+          <Legenda>{t("permissao.local.explicacao")}</Legenda>
+          <Legenda>{t("permissao.local.android")}</Legenda>
         </View>
-        <Botao titulo="Permitir localização" onPress={pedirLocalizacao} />
+        <Botao titulo={t("permissao.local.permitir")} onPress={pedirLocalizacao} />
       </Centralizado>
     );
   }
@@ -239,14 +234,14 @@ export function BaterPonto({
     const sucesso = etapa.nome === "concluido";
     return (
       <Centralizado>
-        <Titulo>{sucesso ? etapa.titulo : "Não foi possível registrar"}</Titulo>
+        <Titulo>{sucesso ? etapa.titulo : t("ponto.naoRegistrado")}</Titulo>
         <View style={{ marginVertical: 20, width: "100%" }}>
           <Aviso tipo={sucesso ? etapa.tipo : "erro"}>
             {sucesso ? etapa.mensagem : etapa.mensagem}
           </Aviso>
         </View>
         <View style={{ width: "100%", gap: 12 }}>
-          <Botao titulo="Voltar" onPress={() => setEtapa({ nome: "ocioso" })} />
+          <Botao titulo={t("ponto.voltar")} onPress={() => setEtapa({ nome: "ocioso" })} />
           <Botao
             titulo="Ver meus registros"
             variante="secundario"
@@ -310,17 +305,17 @@ export function BaterPonto({
       <View style={{ padding: 16, gap: 12 }}>
         {pendentes > 0 && (
           <Aviso tipo="aviso">
-            {pendentes} {pendentes === 1 ? "registro aguardando" : "registros aguardando"}{" "}
-            envio. Serão enviados assim que houver sinal.
+            {pendentes === 1
+              ? t("ponto.fila.aguardando_um")
+              : t("ponto.fila.aguardando_varios", { n: pendentes })}
           </Aviso>
         )}
 
         {descartadas > 0 && (
           <Aviso tipo="erro">
             {descartadas === 1
-              ? "1 registro guardado não pôde ser enviado e saiu da fila."
-              : `${descartadas} registros guardados não puderam ser enviados e saíram da fila.`}{" "}
-            Avise o RH para lançar o horário manualmente.
+              ? t("ponto.fila.descartado_um")
+              : t("ponto.fila.descartado_varios", { n: descartadas })}
           </Aviso>
         )}
 
@@ -341,11 +336,11 @@ export function BaterPonto({
             </Text>
           </Cartao>
         ) : (
-          <Legenda>Centralize o rosto na moldura e toque em registrar.</Legenda>
+          <Legenda>{t("ponto.enquadre")}</Legenda>
         )}
 
         <Botao
-          titulo="Registrar ponto"
+          titulo={t("ponto.registrar")}
           onPress={() => registrar(false)}
           carregando={ocupado}
           desabilitado={ocupado}
@@ -357,7 +352,7 @@ export function BaterPonto({
             esquece ligado provocaria justamente o engano que ele deveria
             evitar. Dois botões tornam a escolha um ato, não um estado. */}
         <Botao
-          titulo="Bater saída (última do dia)"
+          titulo={t("ponto.baterSaida")}
           variante="secundario"
           onPress={() => registrar(true)}
           carregando={ocupado}
@@ -367,21 +362,21 @@ export function BaterPonto({
         <View style={{ flexDirection: "row", gap: 12 }}>
           <View style={{ flex: 1 }}>
             <Botao
-              titulo="Meus registros"
+              titulo={t("ponto.meusRegistros")}
               variante="secundario"
               onPress={aoAbrirHistorico}
             />
           </View>
           <View style={{ flex: 1 }}>
             <Botao
-              titulo="Diagnóstico"
+              titulo={t("ponto.diagnostico")}
               variante="secundario"
               onPress={aoAbrirDiagnostico}
             />
           </View>
         </View>
 
-        <Botao titulo="Sair" variante="texto" onPress={aoSair} />
+        <Botao titulo={t("ponto.sair")} variante="texto" onPress={aoSair} />
       </View>
     </View>
   );
@@ -457,7 +452,7 @@ function CamposDaBatida({
             value={rotulo ?? ""}
             onChangeText={(texto) => aoEscolherRotulo(texto || null)}
             maxLength={60}
-            placeholder="Ex.: Chegada ao hangar"
+            placeholder={t("ponto.exemploRotulo")}
             placeholderTextColor={cores.textoFraco}
           />
         </View>
@@ -467,7 +462,9 @@ function CamposDaBatida({
         <View style={{ gap: 8, marginTop: config.label_mode === "hidden" ? 0 : 16 }}>
           <Legenda>
             {config.note_prompt ??
-              (config.note_mode === "required" ? "Observação" : "Observação (opcional)")}
+              (config.note_mode === "required"
+              ? t("ponto.observacao")
+              : t("ponto.observacaoOpcional"))}
           </Legenda>
           <TextInput
             style={[estilosCampo.entrada, { minHeight: 72, textAlignVertical: "top" }]}
@@ -475,7 +472,9 @@ function CamposDaBatida({
             onChangeText={aoEscreverObservacao}
             maxLength={500}
             multiline
-            placeholder={config.note_mode === "required" ? "Obrigatório" : "Opcional"}
+            placeholder={
+              config.note_mode === "required" ? t("ponto.obrigatorio") : t("ponto.opcional")
+            }
             placeholderTextColor={cores.textoFraco}
           />
         </View>

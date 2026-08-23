@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
+import { t } from "../i18n";
 import { Botao, Cartao, Titulo, cores } from "../ui";
 
 /**
@@ -22,36 +23,28 @@ export function Consentimento({ aoAceitar }: { aoAceitar: () => void }) {
   return (
     <View style={{ flex: 1, backgroundColor: cores.fundo }}>
       <ScrollView contentContainerStyle={{ padding: 24, gap: 16 }}>
-        <Titulo>Como seus dados são usados</Titulo>
+        <Titulo>{t("termo.titulo")}</Titulo>
 
         <Cartao>
-          <Secao titulo="Sua imagem">
-            No momento de bater o ponto, o aplicativo tira uma foto do seu rosto
-            e a compara com as fotos que você cadastrou com o RH. A comparação
-            acontece no servidor da empresa e serve apenas para confirmar que foi
-            você quem registrou o ponto.
+          <Secao titulo={t("termo.imagem.titulo")}>{t("termo.imagem.corpo")}</Secao>
+        </Cartao>
+
+        <Cartao>
+          <Secao titulo={t("termo.local.titulo")}>
+            {t("termo.local.corpo1")}
+            {"\n\n"}
+            {/* O destaque volta como <Text> negrito: interpolar HTML no
+                catálogo obrigaria cada idioma a acertar marcação, e uma tag
+                mal fechada numa tradução quebraria a tela inteira. */}
+            {partirNoDestaque(t("termo.local.corpo2"), t("termo.local.destaque"))}
           </Secao>
         </Cartao>
 
         <Cartao>
-          <Secao titulo="Sua localização">
-            No mesmo momento, o aplicativo verifica se você está no local de
-            trabalho — pelos beacons instalados, pela rede Wi-Fi da empresa ou
-            pelo GPS.
+          <Secao titulo={t("termo.direitos.titulo")}>
+            {t("termo.direitos.corpo1")}
             {"\n\n"}
-            Isso acontece <Text style={{ fontWeight: "700" }}>apenas quando você
-            bate o ponto</Text>. O aplicativo não acompanha seus deslocamentos e
-            não coleta nada em segundo plano.
-          </Secao>
-        </Cartao>
-
-        <Cartao>
-          <Secao titulo="Seus direitos">
-            Você pode pedir ao RH, a qualquer momento, para ver os dados que a
-            empresa tem sobre você, corrigi-los ou revogar este consentimento.
-            {"\n\n"}
-            Revogar impede o uso do ponto por reconhecimento facial — nesse
-            caso, combine com o RH outra forma de registrar sua jornada.
+            {t("termo.direitos.corpo2")}
           </Secao>
         </Cartao>
 
@@ -82,18 +75,17 @@ export function Consentimento({ aoAceitar }: { aoAceitar: () => void }) {
             {aceito && <Text style={{ color: "#052e16", fontWeight: "700" }}>✓</Text>}
           </View>
           <Text style={{ color: cores.texto, flex: 1, fontSize: 15, lineHeight: 21 }}>
-            Li e concordo com o uso da minha imagem e da minha localização para
-            registro de ponto.
+            {t("termo.aceite")}
           </Text>
         </Pressable>
 
         <Text style={{ color: cores.textoFraco, fontSize: 12 }}>
-          Termo versão {VERSAO_DO_TERMO}
+          {t("termo.versao", { versao: VERSAO_DO_TERMO })}
         </Text>
       </ScrollView>
 
       <View style={{ padding: 24, paddingTop: 0 }}>
-        <Botao titulo="Continuar" onPress={aoAceitar} desabilitado={!aceito} />
+        <Botao titulo={t("termo.continuar")} onPress={aoAceitar} desabilitado={!aceito} />
       </View>
     </View>
   );
@@ -110,6 +102,27 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
       <Text style={{ color: cores.textoFraco, fontSize: 15, lineHeight: 22 }}>
         {children}
       </Text>
+    </>
+  );
+}
+
+
+/**
+ * Devolve o texto com o trecho destacado em negrito.
+ *
+ * O destaque viaja como chave separada, e não como marcação dentro da frase:
+ * interpolar HTML no catálogo obrigaria cada idioma a acertar a marcação, e
+ * uma tag mal fechada numa tradução quebraria a tela toda. Aqui o pior caso é
+ * o texto sair sem negrito.
+ */
+function partirNoDestaque(texto: string, destaque: string) {
+  const partes = texto.split("{destaque}");
+  if (partes.length !== 2) return texto;
+  return (
+    <>
+      {partes[0]}
+      <Text style={{ fontWeight: "700" }}>{destaque}</Text>
+      {partes[1]}
     </>
   );
 }

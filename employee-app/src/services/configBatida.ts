@@ -12,6 +12,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { get } from "./api";
 
+import { t } from "../i18n";
+
 const CHAVE_CACHE = "ponto_config_batida";
 
 export type NoteMode = "hidden" | "optional" | "required";
@@ -81,10 +83,10 @@ export function faltaPreencher(
   { label, note }: { label: string | null; note: string },
 ): string | null {
   if (config.note_mode === "required" && !note.trim()) {
-    return config.note_prompt || "Escreva uma observação para continuar.";
+    return config.note_prompt || t("campo.observacaoObrigatoria");
   }
   if (config.label_required && config.label_mode !== "hidden" && !label?.trim()) {
-    return "Escolha o tipo da batida para continuar.";
+    return t("campo.tipoObrigatorio");
   }
   return null;
 }

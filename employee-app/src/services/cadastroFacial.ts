@@ -8,6 +8,8 @@
 
 import { File } from "expo-file-system";
 
+import { t } from "../i18n";
+
 import { ApiError, enviarMultipart } from "./api";
 
 /** Mínimo e máximo aceitos pelo servidor (`FACE_MIN/MAX_ENROLLMENT_IMAGES`). */
@@ -38,7 +40,7 @@ export async function cadastrarRosto(
   versaoDoTermo: string,
 ): Promise<ResultadoCadastro> {
   if (urisDasFotos.length < MINIMO_DE_FOTOS) {
-    throw new ApiError(`São necessárias ao menos ${MINIMO_DE_FOTOS} fotos.`, 422);
+    throw new ApiError(t("cadastro.poucasFotos", { minimo: MINIMO_DE_FOTOS }), 422);
   }
 
   const dados = new FormData();
@@ -46,7 +48,7 @@ export async function cadastrarRosto(
   urisDasFotos.slice(0, MAXIMO_DE_FOTOS).forEach((uri, indice) => {
     const arquivo = new File(uri);
     if (!arquivo.exists) {
-      throw new ApiError("Uma das fotos não está mais no aparelho.", 422);
+      throw new ApiError(t("cadastro.fotoSumiu"), 422);
     }
     dados.append("images", arquivo, `rosto-${indice + 1}.jpg`);
   });

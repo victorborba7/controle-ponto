@@ -8,6 +8,8 @@
 
 import * as SecureStore from "expo-secure-store";
 
+import { t } from "../i18n";
+
 const CHAVE_ACCESS = "ponto_access";
 const CHAVE_REFRESH = "ponto_refresh";
 const CHAVE_PERFIL = "ponto_perfil";
@@ -129,7 +131,7 @@ async function mensagemDoErro(resposta: Response): Promise<string> {
   } catch {
     // Resposta sem corpo JSON.
   }
-  return `Falha na comunicação (HTTP ${resposta.status})`;
+  return t("erro.httpGenerico", { status: resposta.status });
 }
 
 async function renovar(): Promise<string | null> {
@@ -166,7 +168,7 @@ export async function autenticado(caminho: string, init: RequestInit): Promise<R
 
   if (resposta.status === 401) {
     const novo = await renovar();
-    if (!novo) throw new ApiError("Sessão expirada. Entre novamente.", 401);
+    if (!novo) throw new ApiError(t("erro.sessaoExpirada"), 401);
     resposta = await chamar(novo);
   }
 
