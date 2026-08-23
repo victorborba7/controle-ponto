@@ -7,6 +7,7 @@ física (beacon BLE → Wi-Fi → GPS).
 - **Plano de execução por etapas:** [PLANO-DE-ACAO.md](PLANO-DE-ACAO.md)
 - **Instalação e cadastro dos beacons:** [docs/mapeamento-beacons.md](docs/mapeamento-beacons.md)
 - **Build e teste do app:** [docs/app-do-funcionario.md](docs/app-do-funcionario.md)
+- **Implantar, conferir e reverter:** [docs/runbook.md](docs/runbook.md)
 
 **Estado atual:** backend, painel do RH e app do funcionário implementados. O
 app aguarda validação num Android físico com beacons de verdade — é o único

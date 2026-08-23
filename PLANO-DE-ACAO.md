@@ -383,7 +383,7 @@ Postgres + API respondendo.
 - App: EAS Build → APK/faixa interna no Android, TestFlight no iOS (D6)
 - Logs estruturados, tratamento de erro e healthcheck monitorado
 - Backup do banco configurado e **restauração testada**
-- `docs/runbook.md` — como implantar, como reverter, o que fazer quando cair
+- `docs/runbook.md` — como implantar, como reverter, o que fazer quando cair ✅
 
 **Critério de pronto:** funcionário instala pelo TestFlight/APK e bate ponto em produção.
 
