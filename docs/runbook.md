@@ -179,6 +179,32 @@ O acesso de demonstração para o revisor está em
 [`docs/app-do-funcionario.md`](app-do-funcionario.md) — sem ele a revisão
 reprova, porque o app recusa qualquer rosto não cadastrado.
 
+#### Quando o build falha por capability
+
+```
+Provisioning profile "..." doesn't include the Push Notifications capability.
+doesn't include the aps-environment entitlement.
+```
+
+O perfil de provisionamento **congela as capabilities vigentes quando foi
+emitido**. Acrescentar `expo-notifications` (ou qualquer coisa que traga uma
+entitlement nova) invalida o perfil antigo sem avisar — o erro só aparece no
+fim do build, depois de vinte minutos de fila.
+
+Duas coisas são necessárias, e subir a chave APNs **não faz nenhuma das duas**:
+
+1. A capability habilitada no **App ID**, no portal da Apple
+2. Um perfil de provisionamento emitido **depois** disso
+
+O conserto é rodar o build **sem `--non-interactive`**, logado na conta Apple:
+o EAS lê as entitlements do projeto, habilita a capability no App ID e reemite
+o perfil sozinho. Com `--non-interactive` ele não toca na conta Apple e o build
+falha de novo, igual.
+
+A mesma armadilha já apareceu com a entitlement *Access WiFi Information*.
+Sempre que uma entitlement entrar no `app.json`, o próximo build iOS precisa de
+sessão Apple.
+
 ⚠️ **O build expira 90 dias após o upload.** Quando expira, o app para de
 abrir — funcionário parado na porta do hangar, em data previsível. Marque
 lembrete no **dia 60**.
