@@ -176,7 +176,7 @@ export default function LocalPage() {
               <>
                 <Field
                   label="Namespace"
-                  hint="10 bytes — pode colar como está na etiqueta"
+                  hint="10 bytes, pode colar como está na etiqueta"
                 >
                   <Input name="namespace" required placeholder="edd1ebeac04e5defa017" />
                 </Field>
@@ -226,7 +226,7 @@ export default function LocalPage() {
           {protocolo === "ibeacon" && (
             <p className="text-xs text-zinc-500">
               Funciona nos dois sistemas. No iPhone a leitura passa pelo
-              CoreLocation, que só procura UUIDs conhecidos de antemão — por
+              CoreLocation, que só procura UUIDs conhecidos de antemão; por
               isso o beacon precisa estar cadastrado <strong>antes</strong> de o
               funcionário tentar bater o ponto, e o app precisa ter sincronizado
               a configuração ao menos uma vez com conexão.
@@ -236,7 +236,7 @@ export default function LocalPage() {
           {protocolo === "mac" && (
             <p className="text-xs text-amber-700 dark:text-amber-400">
               O MAC é o identificador mais confiável quando vários beacons saem
-              de fábrica com o mesmo UUID/Major/Minor — ele é único por aparelho.
+              de fábrica com o mesmo UUID/Major/Minor: ele é único por aparelho.
               Em compensação, <strong>não funciona no iPhone</strong>: o iOS não
               expõe o MAC de periféricos por API nenhuma. Confirme também que o
               beacon não rotaciona o endereço (leia o MAC, aguarde 30 min e leia
@@ -286,7 +286,7 @@ export default function LocalPage() {
                   <Td className="font-medium">{beacon.label}</Td>
                   {/* O switch é exaustivo de propósito: um protocolo novo passa
                       a dar erro de compilação aqui em vez de aparecer como
-                      "null null:null" na tela do RH — que foi o que acontecia
+                      "null null:null" na tela do RH, que foi o que acontecia
                       com os beacons cadastrados por MAC. */}
                   <Td className="font-mono text-xs">
                     {identificadorDoBeacon(beacon)}

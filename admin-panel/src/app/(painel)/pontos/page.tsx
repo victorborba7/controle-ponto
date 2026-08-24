@@ -155,7 +155,7 @@ export default function PontosPage() {
               <option value="">Todos</option>
               {funcionarios.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {f.external_code} — {f.name}
+                  {f.external_code}: {f.name}
                 </option>
               ))}
             </Select>

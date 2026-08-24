@@ -125,7 +125,7 @@ export function CapturaWebcam({
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
         Tire de {minimo} a {maximo} fotos, <strong>variando levemente o ângulo e a
         expressão</strong>. Fotos idênticas não tornam o reconhecimento mais
-        robusto — a variação é justamente o que absorve mudança de luz, óculos e
+        robusto; a variação é justamente o que absorve mudança de luz, óculos e
         barba depois.
       </p>
 

@@ -67,7 +67,7 @@ const en = {
   "permissao.camera.permitir": "Allow camera",
   "permissao.local.titulo": "Location permission",
   "permissao.local.explicacao":
-    "Location confirms you are at the worksite. It is used only at the moment you record an entry — the app does not track your movements.",
+    "Location confirms you are at the worksite. It is used only at the moment you record an entry; the app does not track your movements.",
   "permissao.local.android":
     "On Android, this permission is also what allows reading the site beacons and Wi-Fi network.",
   "permissao.local.permitir": "Allow location",
@@ -78,7 +78,7 @@ const en = {
   "cadastro.tituloPermissao": "Enroll your face",
   "cadastro.explicacaoCamera":
     "To enroll your face, the app needs the camera. It is used only for this enrollment and when you record your time.",
-  "cadastro.contador": "Photo {atual} of {total} — {passo}",
+  "cadastro.contador": "Photo {atual} of {total}: {passo}",
   "cadastro.passo1.titulo": "Looking at the camera",
   "cadastro.passo1.instrucao":
     "Face centered, light on your face, no cap or sunglasses.",
@@ -107,7 +107,7 @@ const en = {
     "When you record your time, the app takes a photo of your face and compares it with the photos enrolled with HR. The comparison happens on the company server and serves only to confirm that it was you who recorded the entry.",
   "termo.local.titulo": "Your location",
   "termo.local.corpo1":
-    "At the same moment, the app checks whether you are at the worksite — through the installed beacons, the company Wi-Fi network, or GPS.",
+    "At the same moment, the app checks whether you are at the worksite: through the installed beacons, the company Wi-Fi network, or GPS.",
   "termo.local.destaque": "only when you record your time",
   "termo.local.corpo2":
     "This happens {destaque}. The app does not track your movements and collects nothing in the background.",
@@ -115,7 +115,7 @@ const en = {
   "termo.direitos.corpo1":
     "You may ask HR at any time to see the data the company holds about you, to correct it, or to withdraw this consent.",
   "termo.direitos.corpo2":
-    "Withdrawing prevents the use of face recognition for time tracking — in that case, arrange another way to record your hours with HR.",
+    "Withdrawing prevents the use of face recognition for time tracking; in that case, arrange another way to record your hours with HR.",
   "termo.aceite":
     "I have read and agree to the use of my image and my location for time tracking.",
   "termo.versao": "Terms version {versao}",
@@ -131,7 +131,7 @@ const en = {
   "diag.atualizarCadastro": "Refresh site registration",
   "diag.falhaVarrer": "Could not scan the signals.",
   "diag.falhaAtualizar":
-    "Could not refresh — no network? The previous cache is still valid.",
+    "Could not refresh. No network? The previous cache is still valid.",
   "diag.resumoCadastro":
     "{locais} site(s), {beacons} registered beacon(s)",
   "diag.resumoUuids": " · {uuids} iBeacon UUID(s) to look for",
@@ -150,7 +150,7 @@ const en = {
   "diag.macFixoOuPublico": "fixed, or public",
   "diag.semPermissaoBluetooth": "No Bluetooth permission",
   "diag.legacyNaoEACausa":
-    "No beacon recognized in either pass — the legacy parameter is not the cause. The advertisement is not reaching the app.",
+    "No beacon recognized in either pass; the legacy parameter is not the cause. The advertisement is not reaching the app.",
 
   // --- histórico ---
   "historico.titulo": "My entries",
@@ -178,11 +178,11 @@ const en = {
 
   // --- sinais e permissões do aparelho ---
   "sinal.bluetoothDesligado":
-    "Bluetooth is off — turn it on to detect the site beacons.",
+    "Bluetooth is off. Turn it on to detect the site beacons.",
   "sinal.semPermissaoBluetooth": "Bluetooth permission denied.",
   "sinal.semPermissaoLocalizacao": "Location permission denied.",
   "sinal.wifiNaoIdentificado":
-    "Wi-Fi network not identified — check the location permission.",
+    "Wi-Fi network not identified. Check the location permission.",
   "sinal.wifiSemEntitlement":
     "This iPhone cannot read the Wi-Fi network name. Beacons and GPS still work.",
   "sinal.gpsIndisponivel": "Could not get your location.",
@@ -192,7 +192,7 @@ const en = {
   "sinal.verificandoWifi": "Checking the Wi-Fi network…",
   "sinal.obtendoLocalizacao": "Getting your location…",
   "sinal.faltaLocalParaBle":
-    "Location permission is missing. Android requires it to deliver beacon advertisements — without it the scan finds phones and headphones, but no beacons.",
+    "Location permission is missing. Android requires it to deliver beacon advertisements; without it the scan finds phones and headphones, but no beacons.",
   "sinal.libereLocalNosAjustes":
     " Allow it in Settings → Apps → Waypoint → Permissions → Location.",
   "sinal.bluetoothNegadoAjustes":
@@ -202,7 +202,7 @@ const en = {
   "sinal.androidLocalLiberaBeacon":
     "On this version of Android, the location permission is what allows reading the beacons.",
   "sinal.semIBeaconCadastrado":
-    "No iBeacon registered for this site. On iPhone the UUID must be known in advance — iOS does not scan for iBeacons generically.",
+    "No iBeacon registered for this site. On iPhone the UUID must be known in advance; iOS does not scan for iBeacons generically.",
   "sinal.iBeaconIndisponivel": "iBeacon reading is unavailable in this version of the app.",
   "sinal.iosSemPermissaoLocal":
     "Without location permission, the iPhone does not deliver beacons. Allow it in Settings → Waypoint → Location.",
@@ -267,7 +267,7 @@ const pt: Record<Chave, string> = {
   "permissao.camera.permitir": "Permitir câmera",
   "permissao.local.titulo": "Permissão de localização",
   "permissao.local.explicacao":
-    "A localização confirma que você está no local de trabalho. Ela é usada apenas no momento da batida — o app não acompanha seus deslocamentos.",
+    "A localização confirma que você está no local de trabalho. Ela é usada apenas no momento da batida; o app não acompanha seus deslocamentos.",
   "permissao.local.android":
     "No Android, esta permissão também é o que libera a leitura dos beacons e da rede Wi-Fi do local.",
   "permissao.local.permitir": "Permitir localização",
@@ -277,7 +277,7 @@ const pt: Record<Chave, string> = {
   "cadastro.tituloPermissao": "Cadastro do seu rosto",
   "cadastro.explicacaoCamera":
     "Para cadastrar seu rosto, o aplicativo precisa da câmera. Ela é usada só neste cadastro e no momento de bater o ponto.",
-  "cadastro.contador": "Foto {atual} de {total} — {passo}",
+  "cadastro.contador": "Foto {atual} de {total}: {passo}",
   "cadastro.passo1.titulo": "Olhando para a câmera",
   "cadastro.passo1.instrucao":
     "Rosto centralizado, luz no rosto e sem boné ou óculos escuros.",
@@ -301,7 +301,7 @@ const pt: Record<Chave, string> = {
     "No momento de bater o ponto, o aplicativo tira uma foto do seu rosto e a compara com as fotos que você cadastrou com o RH. A comparação acontece no servidor da empresa e serve apenas para confirmar que foi você quem registrou o ponto.",
   "termo.local.titulo": "Sua localização",
   "termo.local.corpo1":
-    "No mesmo momento, o aplicativo verifica se você está no local de trabalho — pelos beacons instalados, pela rede Wi-Fi da empresa ou pelo GPS.",
+    "No mesmo momento, o aplicativo verifica se você está no local de trabalho: pelos beacons instalados, pela rede Wi-Fi da empresa ou pelo GPS.",
   "termo.local.destaque": "apenas quando você bate o ponto",
   "termo.local.corpo2":
     "Isso acontece {destaque}. O aplicativo não acompanha seus deslocamentos e não coleta nada em segundo plano.",
@@ -309,7 +309,7 @@ const pt: Record<Chave, string> = {
   "termo.direitos.corpo1":
     "Você pode pedir ao RH, a qualquer momento, para ver os dados que a empresa tem sobre você, corrigi-los ou revogar este consentimento.",
   "termo.direitos.corpo2":
-    "Revogar impede o uso do ponto por reconhecimento facial — nesse caso, combine com o RH outra forma de registrar sua jornada.",
+    "Revogar impede o uso do ponto por reconhecimento facial; nesse caso, combine com o RH outra forma de registrar sua jornada.",
   "termo.aceite":
     "Li e concordo com o uso da minha imagem e da minha localização para registro de ponto.",
   "termo.versao": "Termo versão {versao}",
@@ -324,7 +324,7 @@ const pt: Record<Chave, string> = {
   "diag.atualizarCadastro": "Atualizar cadastro do local",
   "diag.falhaVarrer": "Falha ao varrer os sinais.",
   "diag.falhaAtualizar":
-    "Não foi possível atualizar — sem rede? O cache anterior segue valendo.",
+    "Não foi possível atualizar. Sem rede? O cache anterior segue valendo.",
   "diag.resumoCadastro":
     "{locais} local(is), {beacons} beacon(s) cadastrado(s)",
   "diag.resumoUuids": " · {uuids} UUID(s) de iBeacon para procurar",
@@ -343,7 +343,7 @@ const pt: Record<Chave, string> = {
   "diag.macFixoOuPublico": "fixo, ou público",
   "diag.semPermissaoBluetooth": "Sem permissão de Bluetooth",
   "diag.legacyNaoEACausa":
-    "Nenhum beacon reconhecido em nenhuma das duas passadas — o parâmetro legacy não é a causa. O anúncio não está chegando ao app.",
+    "Nenhum beacon reconhecido em nenhuma das duas passadas; o parâmetro legacy não é a causa. O anúncio não está chegando ao app.",
 
   "historico.titulo": "Meus registros",
   "historico.vazio": "Nenhum registro ainda.",
@@ -366,11 +366,11 @@ const pt: Record<Chave, string> = {
   "metodo.none": "Sem sinal de local",
 
   "sinal.bluetoothDesligado":
-    "Bluetooth desligado — ligue para detectar os beacons do local.",
+    "Bluetooth desligado. Ligue para detectar os beacons do local.",
   "sinal.semPermissaoBluetooth": "Permissão de Bluetooth negada.",
   "sinal.semPermissaoLocalizacao": "Permissão de localização negada.",
   "sinal.wifiNaoIdentificado":
-    "Rede Wi-Fi não identificada — verifique a permissão de localização.",
+    "Rede Wi-Fi não identificada. Verifique a permissão de localização.",
   "sinal.wifiSemEntitlement":
     "Este iPhone não consegue ler o nome da rede Wi-Fi. Beacons e GPS continuam funcionando.",
   "sinal.gpsIndisponivel": "Não foi possível obter sua localização.",
@@ -380,7 +380,7 @@ const pt: Record<Chave, string> = {
   "sinal.verificandoWifi": "Verificando a rede Wi-Fi…",
   "sinal.obtendoLocalizacao": "Obtendo a localização…",
   "sinal.faltaLocalParaBle":
-    "Falta a permissão de localização. O Android a exige para entregar os anúncios dos beacons — sem ela a varredura acha celulares e fones, mas nenhum beacon.",
+    "Falta a permissão de localização. O Android a exige para entregar os anúncios dos beacons; sem ela a varredura acha celulares e fones, mas nenhum beacon.",
   "sinal.libereLocalNosAjustes":
     " Libere em Ajustes → Aplicativos → Waypoint → Permissões → Localização.",
   "sinal.bluetoothNegadoAjustes":
@@ -390,7 +390,7 @@ const pt: Record<Chave, string> = {
   "sinal.androidLocalLiberaBeacon":
     "Nesta versão do Android, a permissão de localização é o que libera a leitura dos beacons.",
   "sinal.semIBeaconCadastrado":
-    "Nenhum iBeacon cadastrado neste local. No iPhone é preciso conhecer o UUID de antemão — o iOS não varre iBeacon genericamente.",
+    "Nenhum iBeacon cadastrado neste local. No iPhone é preciso conhecer o UUID de antemão; o iOS não varre iBeacon genericamente.",
   "sinal.iBeaconIndisponivel": "Leitura de iBeacon indisponível nesta versão do app.",
   "sinal.iosSemPermissaoLocal":
     "Sem permissão de localização, o iPhone não entrega os beacons. Libere em Ajustes → Waypoint → Localização.",

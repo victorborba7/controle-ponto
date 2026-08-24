@@ -121,7 +121,7 @@ export function RevisaoDialog({
               />
             ) : fotoIndisponivel ? (
               <p className="rounded-md border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500 dark:border-zinc-700">
-                Foto indisponível — pode ter expirado pela política de retenção.
+                Foto indisponível. Pode ter expirado pela política de retenção.
               </p>
             ) : (
               <p className="text-sm text-zinc-500">Carregando…</p>
@@ -206,7 +206,7 @@ export function RevisaoDialog({
 
             <Field
               label="Horário da batida"
-              hint="Ajuste quando o registro tiver sido enviado com atraso — o horário gravado é o do envio, e a correção fica registrada na auditoria."
+              hint="Ajuste quando o registro tiver sido enviado com atraso; o horário gravado é o do envio, e a correção fica registrada na auditoria."
             >
               <Input
                 type="datetime-local"

@@ -89,7 +89,7 @@ export default function UsuariosPage() {
   }
 
   async function definirSenha(usuario: PanelUser) {
-    const senha = window.prompt(`${t("usuarios.novaSenha")} — ${usuario.name}`);
+    const senha = window.prompt(`${t("usuarios.novaSenha")}: ${usuario.name}`);
     if (!senha) return;
 
     setErro(null);
@@ -284,7 +284,7 @@ function NovoUsuario({
             <Select name="role" defaultValue="hr">
               {PAPEIS.map((papel) => (
                 <option key={papel} value={papel}>
-                  {t(`papel.${papel}`)} — {t(`papel.${papel}.desc`)}
+                  {t(`papel.${papel}`)}: {t(`papel.${papel}.desc`)}
                 </option>
               ))}
             </Select>

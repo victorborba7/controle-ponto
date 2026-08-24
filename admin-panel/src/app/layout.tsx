@@ -21,7 +21,7 @@ const geistSans = Geist({
  * a rota dinâmica só por causa disso. Não compensa.
  */
 export const metadata: Metadata = {
-  title: `${dicionario.en["app.nome"]} — ${dicionario.en["app.painel"]}`,
+  title: `${dicionario.en["app.nome"]}: ${dicionario.en["app.painel"]}`,
   description: dicionario.en["app.descricao"],
 };
 

@@ -114,7 +114,7 @@ const en = {
   "local.endereco": "Address",
   "local.coordenadas": "Coordinates",
   "local.latitude": "Latitude",
-  "local.latitudeAjuda": "Optional — used only by the GPS fallback",
+  "local.latitudeAjuda": "Optional, used only by the GPS fallback",
   "local.longitude": "Longitude",
   "local.raio": "Geofence radius ({unidade})",
   "local.raioAjuda": "A radius that is too tight rejects people who are on site, because GPS is imprecise.",
@@ -146,12 +146,12 @@ const en = {
   "situacao.suspended": "Suspended",
 
   // --- orientação de qualidade de foto ---
-  "qualidade.blurry": "out of focus — hold the camera steady and don't move when you click",
-  "qualidade.face_too_small": "face too small — move closer to the camera",
-  "qualidade.face_too_far": "too far away — the face should fill much of the frame",
-  "qualidade.face_cropped": "face cut off — center it in the frame",
+  "qualidade.blurry": "out of focus: hold the camera steady and don't move when you click",
+  "qualidade.face_too_small": "face too small: move closer to the camera",
+  "qualidade.face_too_far": "too far away: the face should fill much of the frame",
+  "qualidade.face_cropped": "face cut off: center it in the frame",
   "qualidade.low_detection_confidence":
-    "face not clear enough — improve the lighting and look at the camera",
+    "face not clear enough: improve the lighting and look at the camera",
 
   // --- motivo de recusa (códigos do backend) ---
   "recusa.multiple_faces": "more than one face in the photo",
@@ -250,7 +250,7 @@ const pt: Record<Chave, string> = {
   "local.endereco": "Endereço",
   "local.coordenadas": "Coordenadas",
   "local.latitude": "Latitude",
-  "local.latitudeAjuda": "Opcional — usada apenas no fallback por GPS",
+  "local.latitudeAjuda": "Opcional, usada apenas no fallback por GPS",
   "local.longitude": "Longitude",
   "local.raio": "Raio do geofence ({unidade})",
   "local.raioAjuda": "Um raio apertado demais rejeita quem está no local, por imprecisão do GPS.",
@@ -277,12 +277,12 @@ const pt: Record<Chave, string> = {
   "situacao.inactive": "Inativo",
   "situacao.suspended": "Suspenso",
 
-  "qualidade.blurry": "foto desfocada — firme a câmera e evite mexer ao clicar",
-  "qualidade.face_too_small": "rosto pequeno demais — chegue mais perto da câmera",
-  "qualidade.face_too_far": "muito longe — o rosto precisa ocupar boa parte do quadro",
-  "qualidade.face_cropped": "rosto cortado — centralize no enquadramento",
+  "qualidade.blurry": "foto desfocada: firme a câmera e evite mexer ao clicar",
+  "qualidade.face_too_small": "rosto pequeno demais: chegue mais perto da câmera",
+  "qualidade.face_too_far": "muito longe: o rosto precisa ocupar boa parte do quadro",
+  "qualidade.face_cropped": "rosto cortado: centralize no enquadramento",
   "qualidade.low_detection_confidence":
-    "rosto pouco nítido para o sistema — melhore a iluminação e olhe para a câmera",
+    "rosto pouco nítido para o sistema: melhore a iluminação e olhe para a câmera",
 
   "recusa.multiple_faces": "mais de um rosto na foto",
   "recusa.no_face_detected": "nenhum rosto identificado na foto",

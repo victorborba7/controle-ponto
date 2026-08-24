@@ -99,7 +99,7 @@ export default function FuncionarioPage() {
         setAviso(
           `${resultado.created.length} foto(s) aceita(s). Recusadas: ` +
             resultado.rejected
-              .map((r) => `${r.filename} — ${explicarRecusa(r.reason, r.issues)}`)
+              .map((r) => `${r.filename}: ${explicarRecusa(r.reason, r.issues)}`)
               .join(" · "),
         );
       }
@@ -224,7 +224,7 @@ export default function FuncionarioPage() {
           <div className="space-y-3">
             <Field
               label="Nova senha"
-              hint="Provisória — o funcionário troca no primeiro acesso"
+              hint="Provisória, o funcionário troca no primeiro acesso"
             >
               <Input
                 type="text"
@@ -314,7 +314,7 @@ export default function FuncionarioPage() {
       <Card title="Aparelhos pareados">
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
           O ponto só é aceito do celular pareado. Revogue quando o aparelho for
-          perdido, roubado ou devolvido — o funcionário continua entrando no app
+          perdido, roubado ou devolvido; o funcionário continua entrando no app
           para ver o próprio histórico, mas para de bater ponto até o RH
           reautorizar.
         </p>

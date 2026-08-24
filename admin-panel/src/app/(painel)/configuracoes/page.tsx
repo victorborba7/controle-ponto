@@ -91,7 +91,7 @@ export default function ConfiguracoesPage() {
     if (rotulos.some((r) => !r.name.trim())) return "Há opção sem nome.";
     if (new Set(nomes).size !== nomes.length) return "Há duas opções com o mesmo nome.";
     if (labelMode === "list" && ativos.length === 0) {
-      return "O modo de lista precisa de ao menos uma opção ativa — senão o funcionário vê uma tela de escolha sem nada para escolher.";
+      return "O modo de lista precisa de ao menos uma opção ativa; senão o funcionário vê uma tela de escolha sem nada para escolher.";
     }
     if (labelRequired && labelMode === "hidden") {
       return "Não dá para exigir o tipo da batida sem exibi-lo.";
@@ -158,7 +158,7 @@ export default function ConfiguracoesPage() {
         <h1 className="text-xl font-semibold">Configurações de batida</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Define o que o funcionário preenche ao bater o ponto. Vale para a
-          empresa inteira e passa a valer na próxima batida — registros
+          empresa inteira e passa a valer na próxima batida; registros
           anteriores não mudam.
         </p>
       </div>
@@ -180,8 +180,8 @@ export default function ConfiguracoesPage() {
               onChange={(e) => setNoteMode(e.target.value as NoteMode)}
             >
               <option value="hidden">Não pedir</option>
-              <option value="optional">Opcional — pode deixar em branco</option>
-              <option value="required">Obrigatória — barra a batida se vazia</option>
+              <option value="optional">Opcional: pode deixar em branco</option>
+              <option value="required">Obrigatória: barra a batida se vazia</option>
             </Select>
           </Field>
 
@@ -213,7 +213,7 @@ export default function ConfiguracoesPage() {
         <div className="space-y-4">
           <p className="text-sm text-zinc-500">
             Sem configuração, o sistema alterna entrada e saída sozinho a partir
-            da última batida — o funcionário não escolhe, e não erra.
+            da última batida; o funcionário não escolhe, e não erra.
           </p>
 
           <Field label="Como o funcionário nomeia a batida">
@@ -221,9 +221,9 @@ export default function ConfiguracoesPage() {
               value={labelMode}
               onChange={(e) => trocarModoRotulo(e.target.value as LabelMode)}
             >
-              <option value="hidden">Não perguntar — entrada e saída automáticas</option>
-              <option value="free">Texto livre — ele escreve o que quiser</option>
-              <option value="list">Lista — ele escolhe entre as opções abaixo</option>
+              <option value="hidden">Não perguntar: entrada e saída automáticas</option>
+              <option value="free">Texto livre: ele escreve o que quiser</option>
+              <option value="list">Lista: ele escolhe entre as opções abaixo</option>
             </Select>
           </Field>
 
@@ -388,7 +388,7 @@ function EditorDeRotulos({
       <Alerta tipo="info">
         Para tirar uma opção de circulação, <strong>desmarque &ldquo;Ativa&rdquo;
         </strong> em vez de remover. Ela some da tela do funcionário e continua
-        legível nos pontos antigos — remover não apaga o histórico, mas
+        legível nos pontos antigos; remover não apaga o histórico, mas
         desativar deixa claro que a opção existiu.
       </Alerta>
     </div>

@@ -94,12 +94,12 @@ export const corMetodo: Record<LocationMethod, string> = {
  * se deve chegar mais perto, acender a luz ou firmar a mão.
  */
 export const orientacaoQualidade: Record<string, string> = {
-  blurry: "foto desfocada — firme a câmera e evite mexer ao clicar",
-  face_too_small: "rosto pequeno demais — chegue mais perto da câmera",
-  face_too_far: "muito longe — o rosto precisa ocupar boa parte do quadro",
-  face_cropped: "rosto cortado — centralize no enquadramento",
+  blurry: "foto desfocada: firme a câmera e evite mexer ao clicar",
+  face_too_small: "rosto pequeno demais: chegue mais perto da câmera",
+  face_too_far: "muito longe: o rosto precisa ocupar boa parte do quadro",
+  face_cropped: "rosto cortado: centralize no enquadramento",
   low_detection_confidence:
-    "rosto pouco nítido para o sistema — melhore a iluminação e olhe para a câmera",
+    "rosto pouco nítido para o sistema: melhore a iluminação e olhe para a câmera",
 };
 
 export function explicarRecusa(reason: string, issues: string[]): string {
