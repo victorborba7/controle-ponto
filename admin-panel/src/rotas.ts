@@ -14,6 +14,7 @@ export const rotas = {
   funcionarios: "/funcionarios",
   locais: "/locais",
   configuracoes: "/configuracoes",
+  usuarios: "/usuarios",
   login: "/login",
 } as const;
 

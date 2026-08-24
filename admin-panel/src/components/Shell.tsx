@@ -17,6 +17,7 @@ const navegacao: { href: string; chave: Chave }[] = [
   { href: rotas.funcionarios, chave: "nav.funcionarios" },
   { href: rotas.locais, chave: "nav.locais" },
   { href: rotas.configuracoes, chave: "nav.configuracoes" },
+  { href: rotas.usuarios, chave: "nav.usuarios" },
 ];
 
 type Sessao = {

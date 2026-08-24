@@ -14,6 +14,7 @@ from app.api.v1 import (
     punch_config,
     sites,
     time_entries,
+    users,
 )
 from app.core.config import settings
 from app.db.session import engine
@@ -81,3 +82,4 @@ app.include_router(face_templates.router_proprio, prefix=settings.api_v1_prefix)
 app.include_router(punch_config.router, prefix=settings.api_v1_prefix)
 app.include_router(sites.router, prefix=settings.api_v1_prefix)
 app.include_router(time_entries.router, prefix=settings.api_v1_prefix)
+app.include_router(users.router, prefix=settings.api_v1_prefix)

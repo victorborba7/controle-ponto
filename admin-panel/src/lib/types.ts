@@ -7,6 +7,16 @@
  */
 
 export type UserRole = "owner" | "hr" | "viewer";
+export type PanelUser = {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  is_active: boolean;
+  last_login_at: string | null;
+  created_at: string;
+};
+
 export type EmployeeStatus = "active" | "inactive" | "suspended";
 export type EntryType = "in" | "out" | "break_start" | "break_end";
 export type LocationMethod = "beacon" | "wifi" | "gps" | "none";

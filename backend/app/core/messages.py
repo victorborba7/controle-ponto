@@ -73,6 +73,10 @@ class Msg(StrEnum):
     ROSTO_NAO_CADASTRADO = "face_not_enrolled"
     ROSTO_JA_CADASTRADO = "face_already_enrolled"
     SAIDA_SEM_ENTRADA = "clock_out_without_clock_in"
+    USUARIO_NAO_ENCONTRADO = "user_not_found"
+    EMAIL_JA_USADO = "email_already_used"
+    NAO_PODE_MUDAR_A_SI_MESMO = "cannot_change_self"
+    ULTIMO_PROPRIETARIO = "last_owner"
     LEMBRETE_TITULO = "reminder_title"
     LEMBRETE_CORPO = "reminder_body"
     ROSTO_NAO_RECONHECIDO = "face_not_recognized"
@@ -149,6 +153,14 @@ CATALOGO: Final[dict[str, dict[Msg, str]]] = {
         ),
         Msg.SAIDA_SEM_ENTRADA: (
             "You have not clocked in today, so there is no shift to close."
+        ),
+        Msg.USUARIO_NAO_ENCONTRADO: "User not found.",
+        Msg.EMAIL_JA_USADO: "There is already a user with this email in your company.",
+        Msg.NAO_PODE_MUDAR_A_SI_MESMO: (
+            "You cannot change your own role or deactivate yourself. Ask another owner."
+        ),
+        Msg.ULTIMO_PROPRIETARIO: (
+            "This is the last owner. Promote someone else before changing this account."
         ),
         Msg.LEMBRETE_TITULO: "Time to check in",
         Msg.LEMBRETE_CORPO: (
@@ -232,6 +244,14 @@ CATALOGO: Final[dict[str, dict[Msg, str]]] = {
         ),
         Msg.SAIDA_SEM_ENTRADA: (
             "Você ainda não bateu entrada hoje, então não há jornada para encerrar."
+        ),
+        Msg.USUARIO_NAO_ENCONTRADO: "Usuário não encontrado.",
+        Msg.EMAIL_JA_USADO: "Já existe um usuário com este e-mail na sua empresa.",
+        Msg.NAO_PODE_MUDAR_A_SI_MESMO: (
+            "Você não pode mudar o próprio papel nem se desativar. Peça a outro proprietário."
+        ),
+        Msg.ULTIMO_PROPRIETARIO: (
+            "Este é o último proprietário. Promova outra pessoa antes de alterar esta conta."
         ),
         Msg.LEMBRETE_TITULO: "Hora de registrar",
         Msg.LEMBRETE_CORPO: (
