@@ -19,6 +19,7 @@ Variaveis (as marcadas com * nao tem padrao e o script recusa rodar sem elas):
     SEED_TENANT_SLUG      identificador curto, minusculo
     SEED_ADMIN_EMAIL   *  login do admin do RH
     SEED_ADMIN_NAME       nome exibido do admin
+    SEED_ADMIN_PASSWORD   senha inicial; vazio = sorteada e impressa uma vez
     SEED_SITE_NAME        nome do local
     SEED_SITE_ADDRESS     endereco, para leitura humana
     SEED_SITE_LAT      *  latitude, em graus decimais
@@ -114,9 +115,15 @@ async def semear(session: AsyncSession) -> None:
     session.add(tenant)
     await session.flush()  # atribui tenant.id para as FKs abaixo
 
-    # Sorteada, nunca fixa: senha padrao em producao e senha que sobrevive ao
+    # Sorteada por padrao: senha fixa em producao e senha que sobrevive ao
     # primeiro acesso e vira porta aberta. Impressa uma vez, so aqui.
-    senha_admin = secrets.token_urlsafe(12)
+    #
+    # SEED_ADMIN_PASSWORD existe para o caso de entrega assistida, em que a
+    # senha e combinada antes e passada a mao ao cliente. Vale saber o que se
+    # perde: uma senha escolhida por quem instala costuma ser mais fraca que
+    # uma sorteada, e costuma ser reaproveitada. Ate haver troca de senha no
+    # painel, ela e a senha permanente de quem a recebeu.
+    senha_admin = os.environ.get("SEED_ADMIN_PASSWORD", "").strip() or secrets.token_urlsafe(12)
     admin = User(
         tenant_id=tenant.id,
         email=email_admin,
