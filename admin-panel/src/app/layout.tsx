@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { ProvedorDeIdioma } from "@/i18n/contexto";
 import { dicionario } from "@/i18n/dicionario";
-import { COOKIE_IDIOMA, normalizar } from "@/i18n/idioma";
+import { COOKIE_IDIOMA, deAccept, normalizar } from "@/i18n/idioma";
 
 import "./globals.css";
 
@@ -28,7 +28,12 @@ export const metadata: Metadata = {
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const idioma = normalizar((await cookies()).get(COOKIE_IDIOMA)?.value);
+  // O cookie ganha do navegador: quem usou o seletor fez uma escolha explícita,
+  // e o cabeçalho do navegador é só um palpite sobre a mesma pergunta.
+  const escolhido = (await cookies()).get(COOKIE_IDIOMA)?.value;
+  const idioma = escolhido
+    ? normalizar(escolhido)
+    : (deAccept((await headers()).get("accept-language")) ?? normalizar(null));
 
   return (
     <html lang={idioma} className={`${geistSans.variable} h-full antialiased`}>
