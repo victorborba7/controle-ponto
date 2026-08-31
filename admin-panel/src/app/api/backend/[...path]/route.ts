@@ -16,6 +16,9 @@ import { backendUrl, clearSession, readSession, saveSession } from "@/lib/sessio
 
 const METODOS_COM_CORPO = new Set(["POST", "PUT", "PATCH"]);
 
+/** Status em que a resposta nao pode ter corpo, por especificacao. */
+const SEM_CORPO = new Set([204, 205, 304]);
+
 async function encaminhar(request: Request, caminho: string[]) {
   const url = new URL(request.url);
   const destino = backendUrl(`/api/v1/${caminho.join("/")}${url.search}`);
@@ -38,7 +41,13 @@ async function encaminhar(request: Request, caminho: string[]) {
     }
   }
 
-  const conteudo = await resposta.arrayBuffer();
+  // 204, 205 e 304 nao podem ter corpo, e o construtor de `Response` lanca
+  // TypeError se receber um. Um ArrayBuffer de zero bytes ainda conta como
+  // corpo, entao ler e repassar quebrava toda resposta sem conteudo: o painel
+  // via 500 onde a API tinha respondido 204 sem erro nenhum.
+  const corpoResposta = SEM_CORPO.has(resposta.status)
+    ? null
+    : await resposta.arrayBuffer();
   const cabecalhos = new Headers();
 
   for (const nome of ["content-type", "content-disposition", "cache-control"]) {
@@ -46,7 +55,7 @@ async function encaminhar(request: Request, caminho: string[]) {
     if (valor) cabecalhos.set(nome, valor);
   }
 
-  return new NextResponse(conteudo, {
+  return new NextResponse(corpoResposta, {
     status: resposta.status,
     headers: cabecalhos,
   });
