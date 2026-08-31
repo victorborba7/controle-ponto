@@ -3,7 +3,13 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useState } from "react";
 import { SafeAreaView, View } from "react-native";
 
-import { encerrarSessao, lerPerfil, salvarPerfil, type Perfil } from "./src/services/api";
+import {
+  encerrarSessao,
+  lerPerfil,
+  salvarPerfil,
+  sincronizarPerfil,
+  type Perfil,
+} from "./src/services/api";
 import { registrarParaLembretes } from "./src/services/lembretes";
 import { encerrarBle } from "./src/services/localizacao";
 import { BaterPonto } from "./src/telas/BaterPonto";
@@ -15,6 +21,32 @@ import { Login } from "./src/telas/Login";
 import { Legenda, cores } from "./src/ui";
 
 const CHAVE_CONSENTIMENTO = "ponto_consentimento_versao";
+const CHAVE_INSTALACAO = "ponto_instalacao";
+
+/**
+ * Derruba a sessão que não foi aberta nesta instalação.
+ *
+ * No iOS a sessão fica no Keychain, que **não** é apagado quando o app é
+ * desinstalado; no Android o armazenamento seguro vai embora junto. Sem isto,
+ * um iPhone que já rodou o Waypoint abre direto na batida de ponto, com o
+ * perfil de quem entrou antes e sem passar pelo login: o ponto sai no nome
+ * errado, e foi assim que o problema apareceu.
+ *
+ * O marcador vive no AsyncStorage justamente porque ele **é** apagado na
+ * remoção do app. Sem marcador, a sessão guardada não tem procedência: ou é
+ * instalação nova sobre um Keychain velho, ou é a primeira abertura desta
+ * versão, que é onde estão as sessões que ninguém sabe de quem são. Nos dois
+ * casos o certo é pedir login.
+ *
+ * O preço é uma entrada a mais para quem já usava o app, uma única vez. É
+ * menos que deixar um aparelho batendo ponto no nome de outra pessoa.
+ */
+async function descartarSessaoSemProcedencia() {
+  if (await AsyncStorage.getItem(CHAVE_INSTALACAO)) return;
+
+  await encerrarSessao();
+  await AsyncStorage.setItem(CHAVE_INSTALACAO, "1");
+}
 
 /**
  * Para onde vai quem acabou de entrar.
@@ -47,7 +79,35 @@ export default function App() {
   const [tela, setTela] = useState<Tela>("carregando");
   const [perfil, setPerfil] = useState<Perfil | null>(null);
 
+  /**
+   * Retoma a sessão guardada, conferindo antes com o servidor.
+   *
+   * O perfil salvo envelhece: o rosto pode ter sido cadastrado pelo painel
+   * depois do último login, ou desativado. Decidir a tela só pelo cache foi o
+   * que mandou um funcionário sem rosto direto para a batida de ponto.
+   */
+  const retomarSessao = useCallback(async () => {
+    const salvo = await lerPerfil();
+    if (!salvo) {
+      setPerfil(null);
+      setTela("login");
+      return;
+    }
+
+    const conferido = await sincronizarPerfil(salvo);
+    if (conferido.situacao === "invalida") {
+      setPerfil(null);
+      setTela("login");
+      return;
+    }
+
+    setPerfil(conferido.perfil);
+    setTela(telaDeQuemEntrou(conferido.perfil));
+  }, []);
+
   const decidirTelaInicial = useCallback(async () => {
+    await descartarSessaoSemProcedencia();
+
     const consentido = await AsyncStorage.getItem(CHAVE_CONSENTIMENTO);
 
     // Termo novo exige aceite novo: sem isso não daria para provar *o que* a
@@ -57,14 +117,8 @@ export default function App() {
       return;
     }
 
-    const salvo = await lerPerfil();
-    if (salvo) {
-      setPerfil(salvo);
-      setTela(telaDeQuemEntrou(salvo));
-    } else {
-      setTela("login");
-    }
-  }, []);
+    await retomarSessao();
+  }, [retomarSessao]);
 
   useEffect(() => {
     void decidirTelaInicial();
@@ -75,9 +129,7 @@ export default function App() {
 
   async function aceitarTermo() {
     await AsyncStorage.setItem(CHAVE_CONSENTIMENTO, VERSAO_DO_TERMO);
-    const salvo = await lerPerfil();
-    setPerfil(salvo);
-    setTela(salvo ? telaDeQuemEntrou(salvo) : "login");
+    await retomarSessao();
   }
 
   async function sair() {

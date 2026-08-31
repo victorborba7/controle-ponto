@@ -243,3 +243,83 @@ export async function entrar(params: {
   await salvarSessao(corpo.tokens, perfil);
   return perfil;
 }
+
+// --------------------------------------------------------------------------
+// Reconferência da sessão guardada
+// --------------------------------------------------------------------------
+
+/** Quanto tempo esperar pela conferência antes de seguir com o cache. */
+const ESPERA_DA_CONFERENCIA_MS = 6000;
+
+/** O que `/auth/me` devolve para um funcionário. */
+type Identidade = {
+  subject_id: string;
+  name: string;
+  face_enrolled: boolean | null;
+};
+
+export type Sincronizacao =
+  | { situacao: "ok"; perfil: Perfil }
+  | { situacao: "offline"; perfil: Perfil }
+  | { situacao: "invalida" };
+
+/**
+ * Confere com o servidor o perfil que estava guardado no aparelho.
+ *
+ * O app decide a primeira tela pelo perfil salvo, e um perfil salvo envelhece:
+ * o RH pode ter desativado o rosto, e — no iOS — a sessão inteira pode ser de
+ * outra instalação, porque o Keychain sobrevive à remoção do app. Quem responde
+ * quem é o portador do token é o servidor, não o cache.
+ *
+ * Falha de rede **não** invalida nada: o hangar tem ponto cego de sinal, e
+ * derrubar o login de quem está sem internet trocaria uma tela errada por uma
+ * pessoa sem conseguir bater ponto. Só o 401 encerra, porque aí o servidor
+ * disse explicitamente que aquela sessão não vale mais.
+ */
+export async function sincronizarPerfil(salvo: Perfil): Promise<Sincronizacao> {
+  // Esta chamada acontece com o app ainda na tela de carregamento. Sem teto de
+  // tempo, um hangar com sinal ruim deixaria a pessoa olhando "Carregando…"
+  // até o `fetch` desistir sozinho, que pode passar de um minuto. Estourado o
+  // prazo, vale o perfil guardado.
+  const relogio = new AbortController();
+  const prazo = setTimeout(() => relogio.abort(), ESPERA_DA_CONFERENCIA_MS);
+
+  let eu: Identidade;
+  try {
+    const resposta = await autenticado("/auth/me", {
+      method: "GET",
+      signal: relogio.signal,
+    });
+    if (resposta.status === 401) {
+      await encerrarSessao();
+      return { situacao: "invalida" };
+    }
+    if (!resposta.ok) return { situacao: "offline", perfil: salvo };
+    eu = (await resposta.json()) as Identidade;
+  } catch (erro) {
+    if (erro instanceof ApiError && erro.status === 401) {
+      await encerrarSessao();
+      return { situacao: "invalida" };
+    }
+    return { situacao: "offline", perfil: salvo };
+  } finally {
+    clearTimeout(prazo);
+  }
+
+  // Token de uma pessoa e perfil de outra não deveria acontecer; se acontecer,
+  // o ponto sairia no nome errado. Recomeçar do login é o único desfecho seguro.
+  if (eu.subject_id !== salvo.employeeId) {
+    await encerrarSessao();
+    return { situacao: "invalida" };
+  }
+
+  const perfil: Perfil = {
+    ...salvo,
+    nome: eu.name,
+    // `null` é o painel, que nunca chega aqui; ainda assim, na dúvida vale o
+    // que já estava salvo em vez de mandar alguém recadastrar o rosto.
+    rostoCadastrado: eu.face_enrolled ?? salvo.rostoCadastrado,
+  };
+  await salvarPerfil(perfil);
+  return { situacao: "ok", perfil };
+}

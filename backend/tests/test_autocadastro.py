@@ -274,3 +274,48 @@ async def test_sem_consentimento_nao_cadastra(client: AsyncClient, app_do_funcio
         data=_consentimento(granted=False),
     )
     assert resposta.status_code == 403
+
+
+# --------------------------------------------------------------------------
+# O sinal que manda o app para a tela certa
+# --------------------------------------------------------------------------
+#
+# `face_enrolled` e a unica coisa que o app consulta para decidir entre cadastro
+# do rosto e batida de ponto. Ninguem cobria esse campo, e um iPhone abriu
+# direto na batida sem rosto cadastrado. O caminho do autocadastro estava certo;
+# o que faltava era garantir que o sinal acompanha o estado real.
+
+
+async def test_login_avisa_que_falta_rosto(client: AsyncClient, app_do_funcionario: dict):
+    login = await client.post(
+        "/api/v1/auth/employee/login",
+        json={
+            "tenant_slug": "acme",
+            "external_code": "0001",
+            "password": TEST_PASSWORD,
+            "device": device_payload("celular-do-joao"),
+        },
+    )
+
+    assert login.status_code == 200, login.text
+    assert login.json()["employee"]["face_enrolled"] is False
+
+
+async def test_me_avisa_que_falta_rosto(client: AsyncClient, app_do_funcionario: dict):
+    """O app reconfere aqui na abertura, porque o perfil guardado envelhece."""
+    resposta = await client.get("/api/v1/auth/me", headers=app_do_funcionario["headers"])
+
+    assert resposta.status_code == 200, resposta.text
+    assert resposta.json()["face_enrolled"] is False
+
+
+async def test_depois_do_cadastro_o_sinal_vira(client: AsyncClient, app_do_funcionario: dict):
+    await client.post(
+        URL,
+        headers=app_do_funcionario["headers"],
+        files=_fotos(PESSOA),
+        data=_consentimento(),
+    )
+
+    resposta = await client.get("/api/v1/auth/me", headers=app_do_funcionario["headers"])
+    assert resposta.json()["face_enrolled"] is True
