@@ -224,12 +224,12 @@ export default function FuncionarioPage() {
           <div className="space-y-3">
             <Field
               label="Nova senha"
-              hint="Provisória, o funcionário troca no primeiro acesso"
+              hint="Ao menos 12 caracteres. Provisória, o funcionário troca no primeiro acesso"
             >
               <Input
                 type="text"
                 value={novaSenha}
-                minLength={6}
+                minLength={12}
                 onChange={(e) => setNovaSenha(e.target.value)}
               />
             </Field>

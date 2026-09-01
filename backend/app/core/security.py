@@ -32,6 +32,21 @@ ACCESS_TOKEN_TYPE = "access"
 # Senhas
 # --------------------------------------------------------------------------
 
+#: Tamanho minimo de qualquer senha do sistema, para os dois publicos.
+#:
+#: Igual para quem administra e para quem bate ponto, por decisao do time.
+#: O painel exigia 12 e o app 6, e duas regras para a mesma coisa fazem o RH
+#: concluir que o sistema esta com defeito quando uma senha aceita num lugar e
+#: recusada no outro.
+#:
+#: Doze e alto para uma matricula de chao de fabrica, e essa e a escolha: uma
+#: conta de funcionario abre a porta para bater ponto no lugar de outra pessoa,
+#: entao o rigor nao deveria depender de quem a usa.
+#:
+#: **Vale so na definicao.** Senha ja gravada continua funcionando: o hash nao
+#: guarda o tamanho, e forcar troca em massa custaria mais do que resolve.
+SENHA_MINIMA = 12
+
 
 def hash_password(password: str) -> str:
     """Argon2id: resistente a ataque por GPU e hardware dedicado."""

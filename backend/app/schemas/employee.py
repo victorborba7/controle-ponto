@@ -6,6 +6,7 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field
 
+from app.core.security import SENHA_MINIMA
 from app.models.enums import DevicePlatform, EmployeeStatus
 
 
@@ -36,7 +37,9 @@ class EmployeeCreate(BaseModel):
     default_site_id: uuid.UUID | None = None
     # Senha inicial do app. Sem ela o funcionario fica cadastrado mas ainda nao
     # consegue entrar — util para o RH cadastrar antes da admissao.
-    initial_password: str | None = Field(default=None, min_length=6, max_length=200)
+    initial_password: str | None = Field(
+        default=None, min_length=SENHA_MINIMA, max_length=200
+    )
 
 
 class EmployeeUpdate(BaseModel):
@@ -95,7 +98,7 @@ class EmployeeList(BaseModel):
 
 
 class PasswordReset(BaseModel):
-    new_password: str = Field(min_length=6, max_length=200)
+    new_password: str = Field(min_length=SENHA_MINIMA, max_length=200)
 
 
 # --------------------------------------------------------------------------

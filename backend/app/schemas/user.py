@@ -5,11 +5,10 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from app.core.security import SENHA_MINIMA
 from app.models.enums import UserRole
 
-#: Minimo da senha inicial. Igual ao do script de troca por linha de comando:
-#: duas regras diferentes para a mesma senha so ensinariam a contornar a maior.
-SENHA_MINIMA = 12
+# A politica vive em `core.security`, unica para os dois publicos.
 
 
 class UserCreate(BaseModel):

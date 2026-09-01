@@ -100,9 +100,9 @@ export function NovoFuncionarioDialog({
           </Field>
           <Field
             label="Senha inicial do app"
-            hint="Provisória: o funcionário troca no primeiro acesso"
+            hint="Ao menos 12 caracteres. Provisória: o funcionário troca no primeiro acesso"
           >
-            <Input name="initial_password" minLength={6} />
+            <Input name="initial_password" minLength={12} />
           </Field>
         </div>
 

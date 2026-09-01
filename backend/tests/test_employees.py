@@ -360,3 +360,23 @@ async def test_auditoria_nao_registra_operacao_revertida(
     depois = len((await db.execute(select(AuditLog))).scalars().all())
 
     assert depois == antes
+
+
+async def test_senha_curta_do_funcionario_e_recusada(
+    client: AsyncClient, db: AsyncSession, empresa: dict, sessao: dict
+):
+    """A regra e a mesma dos dois publicos (core.security.SENHA_MINIMA).
+
+    Antes o app aceitava 6 e o painel exigia 12. Duas regras para a mesma coisa
+    fazem o RH concluir que o sistema esta com defeito quando uma senha aceita
+    num lugar e recusada no outro.
+    """
+    funcionario = await create_employee(db, empresa["tenant"], external_code="0777")
+    await db.commit()
+
+    resposta = await client.post(
+        f"/api/v1/employees/{funcionario.id}/password",
+        headers=sessao,
+        json={"new_password": "Curta@12"},
+    )
+    assert resposta.status_code == 422
